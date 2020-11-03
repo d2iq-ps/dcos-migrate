@@ -4,11 +4,9 @@ import os
 import subprocess
 from collections import namedtuple
 
-# Release name
-JENKINS = "jenkins"
-
 # DCOS CLI
 DCOS = os.getenv("DCOS_CLI", "dcos")
+MARATHON_JSON = "marathon.json"
 
 # Edit/Update as needed
 Mapping = namedtuple("Mapping", ["DCOS_VERSION", "JENKINS_VERSION", "KUBERNETES_PLUGIN_VERSION", "CHART_VERSION"])
@@ -53,19 +51,22 @@ def run_cmd(cmd: str, print_output: bool = False, check: bool = True, timeout_se
     return result.returncode, stdout, stderr
 
 
-def load_dcos_package(app_id: str) -> [str, str]:
+def download_dcos_package(app_id: str, target_dir: str) -> [str, str]:
     log.info("Validating DC/OS CLI is setup correctly")
     run_cmd("{} --version".format(DCOS), check=True)
 
     _, out, err = run_cmd("{} marathon app show {}".format(DCOS, app_id))
     if len(out) == 0:
-        log.error("empty output detected")
+        log.error("Empty output detected")
         return
 
     app = json.loads(out, encoding=encoding)
+    f = open(os.path.join(target_dir, MARATHON_JSON), "w")
+    f.write(out)
+    f.close()
     DCOS_PACKAGE_NAME = app["labels"]["DCOS_PACKAGE_NAME"]
-    if DCOS_PACKAGE_NAME != JENKINS:
-        log.error('cannot migrate "{}" package'.format(DCOS_PACKAGE_NAME))
+    if DCOS_PACKAGE_NAME != "jenkins":
+        log.error('Cannot migrate "{}" package'.format(DCOS_PACKAGE_NAME))
         return
     DCOS_PACKAGE_VERSION = app["labels"]["DCOS_PACKAGE_VERSION"]
     match = False
@@ -74,20 +75,20 @@ def load_dcos_package(app_id: str) -> [str, str]:
             match = True
             break
     if not match:
-        log.error('cannot migrate "{}" package : version "{}" not yet supported'.format(DCOS_PACKAGE_NAME, DCOS_PACKAGE_VERSION))
+        log.error('Cannot migrate "{}" package : version "{}" not yet supported'.format(DCOS_PACKAGE_NAME, DCOS_PACKAGE_VERSION))
         return
     TASKS = app["tasks"]
     if len(TASKS) != 1:
-        log.error("ambiguity finding task id")
+        log.error("Ambiguity finding task id")
         return
     TASK_ID = TASKS[0]["id"]
     return DCOS_PACKAGE_VERSION, TASK_ID
 
 
-def download_task_data(task_id: str, target_dir: str) -> str:
-    log.info("downloading config.xml")
+def download_task_data(task_id: str, target_dir: str, retain_builds: bool, retain_next_build_number: bool) -> str:
+    log.info("Downloading config.xml")
     run_cmd("{} -v task download {} jenkins_home/config.xml --target-dir={}".format(DCOS, task_id, target_dir), check=True)
-    log.info('downloading jobs folder')
+    log.info('Downloading jobs folder')
     run_cmd("{} task download {} jenkins_home/jobs --target-dir={}".format(DCOS, task_id, target_dir), check=True)
     return "{}/config.xml".format(target_dir)
 
@@ -117,6 +118,8 @@ master:
     path: /jenkins
     annotations:
       kubernetes.io/ingress.class: traefik
+  JCasC:
+    enabled: false
 '''
     HELM_2_CMD = '''
 helm install \\
