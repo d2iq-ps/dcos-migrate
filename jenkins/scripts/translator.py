@@ -248,7 +248,7 @@ def plugin100Transform(cloud) -> str:
         msg = f'"{NAME}" cloud at slaveInfo index "{index}"'
         label = slave_info.find("labelString")
         if label is not None and len(label.text) > 0:
-                msg = f'{msg} with label "{label.text}"'
+            msg = f'{msg} with label "{label.text}"'
         else:
             msg = f'{msg} with empty label'
         log.info("processing {}".format(msg))
@@ -288,6 +288,18 @@ def plugin100Transform(cloud) -> str:
             if len(k8s_field_value) == 0:
                 log.warning(f'Key "{mesos_field_name}" not found in {msg}. Defaulting to empty string.')
             container_template_subs[k8s_field_name] = k8s_field_value
+
+        # If the "isDind" AND "useCustomDockerCommandShell" are set to "true" in containerInfo,
+        # check if "customDockerCommandShell" is equal to "wrapper.sh" and overwrite as needed
+        container_template_subs["command"] = escape(JENKINS_AGENT_ENTRYPOINT)
+        isDind = containerInfo.find("isDind")
+        useCustomDockerCommandShell = containerInfo.find("useCustomDockerCommandShell")
+        customDockerCommandShell = containerInfo.find("customDockerCommandShell")
+        if isDind is not None and useCustomDockerCommandShell is not None and customDockerCommandShell is not None:
+            if bool(isDind.text) and bool(useCustomDockerCommandShell.text):
+                if customDockerCommandShell.text == "wrapper.sh":
+                    container_template_subs["command"] = escape(f"wrapper.sh {JENKINS_AGENT_ENTRYPOINT}")
+
 
         # Loss of information for "additionalURIs" at slaveInfo level and "parameters" at "containerInfo" level
         for item in ["additonalURIs"]:
@@ -354,11 +366,10 @@ def plugin100Transform(cloud) -> str:
             envVars.append(Template(ENV_VARS).substitute(key="JAVA_OPTS", value=jvmArgs.text))
         # TODO : translate env vars from mesos config
         container_template_subs["envVars"] = "".join(envVars)
-        container_template_subs["command"] = escape(JENKINS_AGENT_ENTRYPOINT)
 
         # Mesos config allows only ONE container
         pod_template_subs["CONTAINERS"] = Template(KUBERNETES_CONTAINER_TEMPLATE).substitute(container_template_subs)
-        pod_template_subs["INSTANCE_CAP"] = 10  # TODO
+        pod_template_subs["INSTANCE_CAP"] = 100  # TODO
         pod_templates.append(Template(KUBERNETES_POD_TEMPLATE).substitute(pod_template_subs))
 
     CLOUD_CONFIG = Template(KUBERNETES_CLOUD_TEMPLATE).substitute(
