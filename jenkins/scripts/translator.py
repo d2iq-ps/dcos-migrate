@@ -21,7 +21,7 @@ JENKINS_AGENT_ENTRYPOINT = '/bin/sh -c "wget {}/jnlpJars/agent.jar && mkdir -p /
 
 # Kubernetes Cloud templates - EDIT ONLY IF YOU KNOW WHAT YOU ARE DOING!
 KUBERNETES_CLOUD_TEMPLATE = """
-<org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud plugin="kubernetes@1.27.1.1">
+<org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud plugin="kubernetes@1.24.1">
     <name>$NAME</name>
     <defaultsProviderTemplate></defaultsProviderTemplate>
     <templates>
@@ -246,6 +246,13 @@ def plugin100Transform(cloud) -> str:
     for index in range(len(slaveInfos)):
         slave_info = slaveInfos[index]
         msg = f'"{NAME}" cloud at slaveInfo index "{index}"'
+        label = slave_info.find("labelString")
+        if label is not None and len(label.text) > 0:
+                msg = f'{msg} with label "{label.text}"'
+        else:
+            msg = f'{msg} with empty label'
+        log.info("processing {}".format(msg))
+
         # There MUST be containerInfo in Agent spec. If not, it points to UCR runtime and we can't transform
         containerInfo = slave_info.find("containerInfo")
         container_template_subs = {}
@@ -299,7 +306,7 @@ def plugin100Transform(cloud) -> str:
             log.info("networking not found in containerInfo")
         else:
             networkType = networking.text
-            containerInfo["networking"] = networking
+            container_template_subs["networking"] = networking
             if networkType == "BRIDGE":
                 mesos_port_mappings = containerInfo.find(f"./portMappings")
                 if mesos_port_mappings is None or len(mesos_port_mappings) == 0:
@@ -307,13 +314,13 @@ def plugin100Transform(cloud) -> str:
                 else:
                     k8s_port_mappings = []
                     for port_mapping in mesos_port_mappings:
-                        containerPort = port_mapping.find("./containerPort")
-                        hostPort = port_mapping.find("./hostPort")
-                        protocol = port_mapping.find("./protocol")
+                        containerPort = port_mapping.find("./containerPort").text
+                        hostPort = port_mapping.find("./hostPort").text
+                        protocol = port_mapping.find("./protocol").text
                         # use name as protocol (udp OR tcp)
                         k8s_port_mappings.append(
                             Template(PORT_MAPPING).substitute(containerPort=containerPort, hostPort=hostPort, name=protocol))
-                    container_template_subs["ports"] = k8s_port_mappings
+                    container_template_subs["ports"] = "".join(k8s_port_mappings)
             elif networkType == "HOST":
                 pod_template_subs["hostNetwork"] = "true"
             elif networkType == "USER":
@@ -324,9 +331,7 @@ def plugin100Transform(cloud) -> str:
         # Inject the volume mounts. Mandatory ConfigMap volume mount followed by 0 or more mounts from mesos plugin configuration
         volumes = [Template(CONFIGMAP_VOLUME_MOUNT_TEMPLATE).substitute(mountPath="/var/configmaps", configMapName="jenkins-agent-3-35-5")]
         mesos_volumes = containerInfo.find("volumes")
-        if mesos_volumes is None or len(mesos_volumes) == 0:
-            log.info("no volumes found for migration")
-        else:
+        if mesos_volumes is not None and len(mesos_volumes) > 0:
             for v in mesos_volumes:
                 hostPath = v.find("./hostPath")
                 containerPath = v.find("./containerPath")
@@ -349,10 +354,10 @@ def plugin100Transform(cloud) -> str:
             envVars.append(Template(ENV_VARS).substitute(key="JAVA_OPTS", value=jvmArgs.text))
         # TODO : translate env vars from mesos config
         container_template_subs["envVars"] = "".join(envVars)
+        container_template_subs["command"] = escape(JENKINS_AGENT_ENTRYPOINT)
 
         # Mesos config allows only ONE container
         pod_template_subs["CONTAINERS"] = Template(KUBERNETES_CONTAINER_TEMPLATE).substitute(container_template_subs)
-        container_template_subs["command"] = escape(JENKINS_AGENT_ENTRYPOINT)
         pod_template_subs["INSTANCE_CAP"] = 10  # TODO
         pod_templates.append(Template(KUBERNETES_POD_TEMPLATE).substitute(pod_template_subs))
 
@@ -397,6 +402,7 @@ def translate_mesos_to_k8s_config_xml(src_file: str, target_file: str):
             continue
 
         modified = True
+        # log.info("-------------------\n\n\n {} \n\n\n----------------------".format(new_cloud_str))
         clouds[i] = ET.fromstring(new_cloud_str)
         log.info(f'Completed translation of "{mesos_cloud_tag}" @ "{ver}" in the config file to the Kubernetes Cloud configuration')
 

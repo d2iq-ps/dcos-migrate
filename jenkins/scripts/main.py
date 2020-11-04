@@ -4,9 +4,10 @@ import logging
 import os
 import shutil
 import sys
+from collections import namedtuple
 
-import mesos_to_k8s_translator
-import parse_dcos_package
+import translator
+import downloader
 
 # KUBERNETES CLI
 kubectl = os.getenv("KUBECTL", "kubectl")
@@ -14,11 +15,18 @@ kubectl = os.getenv("KUBECTL", "kubectl")
 log = logging.getLogger("root")
 logging.basicConfig(level=logging.WARN, format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s', )
 
+# Edit/Update as needed
+Mapping = namedtuple("Mapping", ["DCOS_VERSION", "JENKINS_VERSION", "KUBERNETES_PLUGIN_VERSION", "CHART_VERSION"])
+versions = [Mapping("3.6.1-2.190.1", "2.190.1", "1.24.1", "2.6.4")]  # TODO support more versions
 
-def download(args):
+separator = "--------------------------------------------------"
+
+
+# Return the downloaded package version
+def download(args) -> str:
     log.info('Downloading DC/OS package with marathon app id {} into target directory {}'.format(args.app_id, args.target_dir))
-    pkg_ver, task_id = parse_dcos_package.download_dcos_package(args.app_id, args.target_dir)
-    parse_dcos_package.download_task_data(task_id, args.target_dir, args.retain_builds, args.retain_next_build_number)
+    pkg_ver, task_id = downloader.download_dcos_package(args.app_id, args.target_dir, [versions[0][0]])
+    downloader.download_task_data(task_id, args.target_dir, args.retain_builds, args.retain_next_build_number)
 
     do_cleanup = not args.retain_next_build_number or not args.retain_builds
     if do_cleanup:
@@ -34,32 +42,110 @@ def download(args):
             if not args.retain_next_build_number:
                 with contextlib.suppress(FileNotFoundError):
                     os.remove(os.path.join(dirpath, "nextBuildCounter"))
-    parse_dcos_package.print_instructions(pkg_ver)
-    print('Create the following serviceaccount, roles, and rolebindings prior to running helm install:\n\n{}\n\n'.format(
+    return pkg_ver
+
+
+def print_instructions(ver: Mapping = versions[0]):  # TODO: support more versions
+    GENERIC_VALUES = '''
+master:
+  tag: {tag}
+  useSecurity: false
+  installPlugins:
+    - kubernetes:{kubernetes_plugin}
+  additionalPlugins: []
+  csrf:
+    defaultCrumbIssuer:
+      enabled: false
+      proxyCompatability: false
+  prometheus:
+    enabled: true
+    serviceMonitorNamespace: "kubeaddons"
+    serviceMonitorAdditionalLabels:
+      app: jenkins
+      release: prometheus-kubeaddons
+  serviceType: "LoadBalancer"
+  jenkinsUriPrefix: "/jenkins"
+  ingress:
+    enabled: true
+    path: /jenkins
+    annotations:
+      kubernetes.io/ingress.class: traefik
+  JCasC:
+    enabled: false
+'''
+    HELM_2_CMD = '''
+helm install \\
+    --namespace jenkins \\
+    --name jenkins \\
+    -f values.yaml \\
+    --set serviceAccount.create=false \\
+    --set serviceAccount.name=jenkins \\
+    --set serviceAccountAgent.name=jenkins \\
+    --repo https://charts.jenkins.io \\
+    --version {version} \\
+    jenkins
+'''
+    HELM_3_CMD = '''
+helm install jenkins \\
+    --namespace jenkins \\
+    -f values.yaml \\
+    --set serviceAccount.create=false \\
+    --set serviceAccount.name=jenkins \\
+    --set serviceAccountAgent.name=jenkins \\
+    --repo https://charts.jenkins.io \\
+    --version {version} \\
+    jenkins
+'''
+
+    PLUGIN_SCRIPT = '''def skipPlugins = ["mesos", "metrics-graphite"]
+
+Jenkins.instance.pluginManager.plugins.each{
+  plugin ->
+    name = plugin.getShortName()
+    if (!skipPlugins.contains(name)) {
+        println ("- ${name}:${plugin.getVersion()}")
+    }
+}'''
+    print(separator)
+    print('Create the following serviceaccount, roles, and rolebindings prior to running helm install:\n{}'.format(
         "{} apply -f resources/serviceaccount.yaml --namespace jenkins".format(kubectl)
     ))
+    print(separator)
+    print('Use following values.yaml to install helm chart\ncat <<EOF >> values.yaml{}EOF'.format(
+        GENERIC_VALUES.format(tag=ver.JENKINS_VERSION, kubernetes_plugin=ver.KUBERNETES_PLUGIN_VERSION)))
+    print(separator)
+    print('For migrating the plugins, go to "<jenkins-url>/script" and run the following script:\n{}\nto get a list of plugins '
+          'which can be added under "master.additionalPlugins" field in values.yaml'.format(PLUGIN_SCRIPT))
+    print(separator)
+    print("Run the following command to install the chart:\nUsing helm v2:\n{}\nUsing helm v3:\n{}".format(
+        HELM_2_CMD.format(version=ver.CHART_VERSION), HELM_3_CMD.format(version=ver.CHART_VERSION)))
+    print(separator)
 
 
 def translate(args):
+    print_instructions()
     log.info('Translating mesos config.xml to k8s config.xml from {} to {}'.format(args.config_file, args.target_file))
     # Point to config.xml downloaded from DC/OS Jenkins Installation
-    out = mesos_to_k8s_translator.translate_mesos_to_k8s_config_xml(args.config_file, args.target_file)
+    out = translator.translate_mesos_to_k8s_config_xml(args.config_file, args.target_file)
     if args.print:
         log.info("Generated config.xml\n======\n{}".format(out))
-    print('Copy the generated "{}" to Jenkins master node on kubernetes using command :\n\n{}\n\n'.format(
+    print(separator)
+    print('Copy the generated "{}" to Jenkins master node on kubernetes using command :\n{}'.format(
         args.target_file,
         "{} cp {} <jenkins-pod-name>:/var/jenkins_home/config.xml --namespace jenkins --container jenkins".format(kubectl, args.target_file)
     ))
+    print(separator)
     print(
-        'Create the following ConfigMap that will be used to mount the JNLP configuration script for your jenkins agents:\n\n{}\n\n'.format(
+        'Create the following ConfigMap that will be used to mount the JNLP configuration script for your jenkins agents:\n{}'.format(
             "{} apply -f resources/configmap-jenkins-agent-3-35-5.yaml --namespace jenkins".format(kubectl)))
+    print(separator)
 
 
 def jobs_copy(args):
     abs_target_dir = os.path.abspath(args.target_dir)
     folder, pod_path = _jobs_dir(abs_target_dir, args.path)
     ns = args.namespace
-    _, name, _ = parse_dcos_package.run_cmd(
+    _, name, _ = downloader.run_cmd(
         '{} get pods --namespace {} --label app.kubernetes.io/instance={} --no-headers --output custom-columns=":metadata.name"'.format(
             kubectl, ns, args.release_name), check=True)
     cmds = [
@@ -74,7 +160,7 @@ def jobs_copy(args):
             print(c)
     else:
         for c in cmds:
-            parse_dcos_package.run_cmd(c)
+            downloader.run_cmd(c)
 
 
 def jobs_update(args):
@@ -87,7 +173,7 @@ def jobs_update(args):
             continue
         if args.disable_jobs:
             job_config_xml = os.path.join(dirpath, "config.xml")
-            parse_dcos_package.run_cmd(
+            downloader.run_cmd(
                 "sed -i '' 's/{}/{}/' {}".format("<disabled>false<\/disabled>", "<disabled>true<\/disabled>", job_config_xml),
                 print_output=False,
                 check=False)
@@ -136,18 +222,19 @@ def main():
     subparsers = parser.add_subparsers(help='sub-commands available')
 
     # Step 1 : Download the DC/OS Jenkins task data
-    downloader = subparsers.add_parser("download", help='Download the DC/OS package data', parents=[parent_parser])
-    downloader.add_argument("--app-id", type=str, default="jenkins", help="Marathon application ID")
-    downloader.add_argument("--retain-builds", action='store_true', help="Set to retain previous builds data")
-    downloader.add_argument("--retain-next-build-number", action='store_true', help='Set to retain nextBuildNumber counter')
-    downloader.set_defaults(func=download)
+    downloader_cmd = subparsers.add_parser("download", help='Download the DC/OS package data', parents=[parent_parser])
+    downloader_cmd.add_argument("--app-id", type=str, default="jenkins", help="Marathon application ID")
+    downloader_cmd.add_argument("--retain-builds", action='store_true', help="Set to retain previous builds data")
+    downloader_cmd.add_argument("--retain-next-build-number", action='store_true', help='Set to retain nextBuildNumber counter')
+    downloader_cmd.set_defaults(func=download)
 
     # Step 2 : Migrate the config.xml from DC/OS Jenkins format to Kubernetes Jenkins format
-    translator = subparsers.add_parser("translate", help='Translate the MesosCloud based config.xml to KubernetesCloud based config.xml')
-    translator.add_argument("-c", "--config-file", type=str, default="./jenkins_home/config.xml", help="path of the config.xml file")
-    translator.add_argument("-t", "--target-file", type=str, default="k8s.config.xml", help="path of the target config.xml file")
-    translator.add_argument("-p", "--print", action='store_true', help="Print the transformed cloud config element from config.xml")
-    translator.set_defaults(func=translate)
+    translator_cmd = subparsers.add_parser("translate",
+                                           help='Translate the MesosCloud based config.xml to KubernetesCloud based config.xml')
+    translator_cmd.add_argument("-c", "--config-file", type=str, default="./jenkins_home/config.xml", help="path of the config.xml file")
+    translator_cmd.add_argument("-t", "--target-file", type=str, default="k8s.config.xml", help="path of the target config.xml file")
+    translator_cmd.add_argument("-p", "--print", action='store_true', help="Print the transformed cloud config element from config.xml")
+    translator_cmd.set_defaults(func=translate)
 
     # Step 3 : Optionally disable jobs and copy them
     jobs = subparsers.add_parser("jobs", help='Perform various operations on jobs')
