@@ -8,17 +8,6 @@ from xml.sax.saxutils import escape
 
 log = logging.getLogger("translator")
 
-# Defaults with provided values.yaml
-# Update according to output of "helm2 list jenkins --output json" if needed
-JENKINS_FULL_NAME = os.getenv("JENKINS_FULL_NAME")
-JENKINS_NAMESPACE = os.getenv("JENKINS_NAMESPACE")
-JENKINS_URI_PREFIX = os.getenv("JENKINS_URI_PREFIX")
-JENKINS_URL = "http://{}.{}.svc:8080{}".format(JENKINS_FULL_NAME, JENKINS_NAMESPACE, JENKINS_URI_PREFIX)
-JENKINS_TUNNEL = "jenkins-agent.{}:50000".format(JENKINS_NAMESPACE)
-
-JENKINS_AGENT_ENTRYPOINT = '/bin/sh -c "wget {}/jnlpJars/agent.jar && mkdir -p /usr/share/jenkins && mv agent.jar /usr/share/jenkins && cp /var/configmaps/jenkins-agent /usr/local/bin/jenkins-agent && chmod +x /usr/local/bin/jenkins-agent && jenkins-agent"'.format(
-    JENKINS_URL)
-
 # Kubernetes Cloud templates - EDIT ONLY IF YOU KNOW WHAT YOU ARE DOING!
 KUBERNETES_CLOUD_TEMPLATE = """
 <org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud plugin="kubernetes@1.24.1">
@@ -84,7 +73,7 @@ KUBERNETES_CONTAINER_TEMPLATE = """
     <image>$image</image>
     <privileged>false</privileged>
     <alwaysPullImage>$alwaysPullImage</alwaysPullImage>
-    <workingDir>$workingDir</workingDir>
+    <workingDir></workingDir>
     <command>$command</command>
     <args></args>
     <ttyEnabled>false</ttyEnabled>
@@ -226,7 +215,7 @@ def plugin100Transform(cloud) -> str:
 
     # Things that exist at mesos "pod level" (children of MesosSlaveInfo) that map to k8s container template
     MESOS_100_POD_TO_KUBERNETES_CONTAINER = {
-        "remoteFSRoot": "workingDir",
+        # "remoteFSRoot": "workingDir", # TODO : workingDir is mounted as emptyDir in k8s so this isn't working
     }
 
     NAME = cloud.find("name").text
@@ -383,6 +372,23 @@ def plugin100Transform(cloud) -> str:
 
 def translate_mesos_to_k8s_config_xml(src_file: str, target_file: str):
     log.info(f'using "{src_file}" file to migrate to kubernetes configuration at "{target_file}"')
+
+    # Defaults with provided values.yaml
+    # Update according to output of "helm2 list jenkins --output json" if needed
+    global JENKINS_FULL_NAME
+    global JENKINS_NAMESPACE
+    global JENKINS_URI_PREFIX
+    global JENKINS_URL
+    global JENKINS_TUNNEL
+    global JENKINS_AGENT_ENTRYPOINT
+    JENKINS_FULL_NAME = os.getenv("JENKINS_FULL_NAME")
+    JENKINS_NAMESPACE = os.getenv("JENKINS_NAMESPACE")
+    JENKINS_URI_PREFIX = os.getenv("JENKINS_URI_PREFIX")
+    JENKINS_URL = "http://{}.{}.svc:8080{}".format(JENKINS_FULL_NAME, JENKINS_NAMESPACE, JENKINS_URI_PREFIX)
+    JENKINS_TUNNEL = "jenkins-agent.{}:50000".format(JENKINS_NAMESPACE)
+
+    JENKINS_AGENT_ENTRYPOINT = '/bin/sh -c "wget {}/jnlpJars/agent.jar && mkdir -p /usr/share/jenkins && mv agent.jar /usr/share/jenkins && cp /var/configmaps/jenkins-agent /usr/local/bin/jenkins-agent && chmod +x /usr/local/bin/jenkins-agent && jenkins-agent"'.format(
+        JENKINS_URL)
     # Currently supported plugin versions
     SUPPORTED_VERSIONS = {
         "mesos@2.0": plugin20Transform,

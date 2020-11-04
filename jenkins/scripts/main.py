@@ -73,7 +73,9 @@ master:
     annotations:
       kubernetes.io/ingress.class: traefik
   JCasC:
-    enabled: false
+    sidecars:
+      configAutoReload:
+        enabled: false
 '''
     HELM_2_CMD = '''
 helm install \\
