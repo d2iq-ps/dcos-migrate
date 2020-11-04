@@ -28,24 +28,26 @@ def download(args) -> str:
     pkg_ver, task_id = downloader.download_dcos_package(args.app_id, args.target_dir, [versions[0][0]])
     downloader.download_task_data(task_id, args.target_dir, args.retain_builds, args.retain_next_build_number)
 
-    do_cleanup = not args.retain_next_build_number or not args.retain_builds
-    if do_cleanup:
-        jobs_dir = os.path.join(os.path.abspath(args.target_dir), "jobs")
-        for dirpath, d_names, f_names in os.walk(jobs_dir):
-            if not os.path.exists(dirpath):
-                continue
-            if not ("builds" in d_names and "nextBuildCounter" in f_names):
-                continue
-            if not args.retain_builds:
-                shutil.rmtree(os.path.join(dirpath, "builds"), ignore_errors=True)
-            # Optionally, remove "nextBuildNumber" file
-            if not args.retain_next_build_number:
-                with contextlib.suppress(FileNotFoundError):
-                    os.remove(os.path.join(dirpath, "nextBuildCounter"))
+    if args.retain_builds and args.retain_next_build_number:
+        return pkg_ver
+
+    # Perform cleanup. TODO: Instead of downloading and removing, download only what's needed.
+    builds_dir = "builds"
+    nextBuildNumber_file = "nextBuildNumber"
+    jobs_dir = os.path.join(os.path.abspath(args.target_dir), "jobs")
+    for dirpath, d_names, f_names in os.walk(jobs_dir):
+        if not os.path.exists(dirpath):
+            continue
+        if not args.retain_builds and builds_dir in d_names:
+            shutil.rmtree(os.path.join(dirpath, "builds"), ignore_errors=True)
+        # Optionally, remove "nextBuildNumber" file
+        if not args.retain_next_build_number and nextBuildNumber_file in f_names:
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(os.path.join(dirpath, nextBuildNumber_file))
     return pkg_ver
 
 
-def print_instructions(ver: Mapping = versions[0]):  # TODO: support more versions
+def print_instructions(namespace: str, ver: Mapping = versions[0]):  # TODO: support more versions
     GENERIC_VALUES = '''
 master:
   tag: {tag}
@@ -75,7 +77,7 @@ master:
 '''
     HELM_2_CMD = '''
 helm install \\
-    --namespace jenkins \\
+    --namespace {namespace} \\
     --name jenkins \\
     -f values.yaml \\
     --set serviceAccount.create=false \\
@@ -87,7 +89,7 @@ helm install \\
 '''
     HELM_3_CMD = '''
 helm install jenkins \\
-    --namespace jenkins \\
+    --namespace {namespace} \\
     -f values.yaml \\
     --set serviceAccount.create=false \\
     --set serviceAccount.name=jenkins \\
@@ -98,14 +100,14 @@ helm install jenkins \\
 '''
 
     PLUGIN_SCRIPT = '''def skipPlugins = ["mesos", "metrics-graphite"]
-
 Jenkins.instance.pluginManager.plugins.each{
   plugin ->
     name = plugin.getShortName()
     if (!skipPlugins.contains(name)) {
         println ("- ${name}:${plugin.getVersion()}")
     }
-}'''
+}
+'''
     print(separator)
     print('Create the following serviceaccount, roles, and rolebindings prior to running helm install:\n{}'.format(
         "{} apply -f resources/serviceaccount.yaml --namespace jenkins".format(kubectl)
@@ -114,43 +116,48 @@ Jenkins.instance.pluginManager.plugins.each{
     print('Use following values.yaml to install helm chart\ncat <<EOF >> values.yaml{}EOF'.format(
         GENERIC_VALUES.format(tag=ver.JENKINS_VERSION, kubernetes_plugin=ver.KUBERNETES_PLUGIN_VERSION)))
     print(separator)
-    print('For migrating the plugins, go to "<jenkins-url>/script" and run the following script:\n{}\nto get a list of plugins '
+    print('For migrating the plugins, go to "<jenkins-url>/script" and run the following script:\n\n{}\nto get a list of plugins '
           'which can be added under "master.additionalPlugins" field in values.yaml'.format(PLUGIN_SCRIPT))
     print(separator)
     print("Run the following command to install the chart:\nUsing helm v2:\n{}\nUsing helm v3:\n{}".format(
-        HELM_2_CMD.format(version=ver.CHART_VERSION), HELM_3_CMD.format(version=ver.CHART_VERSION)))
+        HELM_2_CMD.format(version=ver.CHART_VERSION, namespace=namespace),
+        HELM_3_CMD.format(version=ver.CHART_VERSION, namespace=namespace)))
     print(separator)
 
 
 def translate(args):
-    print_instructions()
+    print_instructions(args.namespace)
     log.info('Translating mesos config.xml to k8s config.xml from {} to {}'.format(args.config_file, args.target_file))
-    # Point to config.xml downloaded from DC/OS Jenkins Installation
+    os.environ["JENKINS_NAMESPACE"] = args.namespace
+    os.environ["JENKINS_FULL_NAME"] = args.fullname
+    os.environ["JENKINS_URI_PREFIX"] = args.uri_prefix
     out = translator.translate_mesos_to_k8s_config_xml(args.config_file, args.target_file)
     if args.print:
         log.info("Generated config.xml\n======\n{}".format(out))
     print(separator)
+    pod_name_cmd = '{} get pods --namespace {} -l=app.kubernetes.io/instance=jenkins --no-headers --output custom-columns=":metadata.name"'.format(kubectl, args.namespace)
     print('Copy the generated "{}" to Jenkins master node on kubernetes using command :\n{}'.format(
         args.target_file,
-        "{} cp {} <jenkins-pod-name>:/var/jenkins_home/config.xml --namespace jenkins --container jenkins".format(kubectl, args.target_file)
+        "{} cp {} $({}):/var/jenkins_home/config.xml --namespace {} --container jenkins".format(kubectl, args.target_file, pod_name_cmd, args.namespace)
     ))
     print(separator)
     print(
         'Create the following ConfigMap that will be used to mount the JNLP configuration script for your jenkins agents:\n{}'.format(
-            "{} apply -f resources/configmap-jenkins-agent-3-35-5.yaml --namespace jenkins".format(kubectl)))
+            "{} apply -f resources/configmap-jenkins-agent-3-35-5.yaml --namespace {}".format(kubectl, args.namespace)))
     print(separator)
 
 
 def jobs_copy(args):
     abs_target_dir = os.path.abspath(args.target_dir)
-    folder, pod_path = _jobs_dir(abs_target_dir, args.path)
+    src_folder, target_folder = _jobs_dir(abs_target_dir, args.path)
+    print("abs target dir {} \n src_folder {} \n target_folder {}".format(abs_target_dir, src_folder, target_folder))
     ns = args.namespace
     _, name, _ = downloader.run_cmd(
-        '{} get pods --namespace {} --label app.kubernetes.io/instance={} --no-headers --output custom-columns=":metadata.name"'.format(
+        '{} get pods --namespace {} -l=app.kubernetes.io/instance={} --no-headers --output custom-columns=":metadata.name"'.format(
             kubectl, ns, args.release_name), check=True)
     cmds = [
-        '{} exec {} --namespace {} --container jenkins -- sh -c "mkdir -p /var/jenkins_home{}"'.format(kubectl, name, ns, pod_path),
-        '{} --namespace {} --container jenkins cp {} {}:/var/jenkins_home/{}'.format(kubectl, ns, folder, name, pod_path)
+        '{} exec {} --namespace {} --container jenkins -- sh -c "mkdir -p {}"'.format(kubectl, name, ns, target_folder),
+        '{} --namespace {} --container jenkins cp {} {}:{}'.format(kubectl, ns, src_folder, name, os.path.dirname(target_folder.rstrip("/")))
     ]
 
     # Print or execute each command.
@@ -160,7 +167,7 @@ def jobs_copy(args):
             print(c)
     else:
         for c in cmds:
-            downloader.run_cmd(c)
+            downloader.run_cmd(c, print_output=True, print_cmd=True)
 
 
 def jobs_update(args):
@@ -171,13 +178,26 @@ def jobs_update(args):
         if "jobs" in d_names or os.path.basename(dirpath) == "jobs":
             # This folder contains sub-sub directories which has other jobs. Nothing to do in this directory
             continue
+        job_config_xml = os.path.join(dirpath, "config.xml")
+        if not os.path.exists(job_config_xml):
+            continue
+        modified = False
         if args.disable_jobs:
-            job_config_xml = os.path.join(dirpath, "config.xml")
             downloader.run_cmd(
-                "sed -i '' 's/{}/{}/' {}".format("<disabled>false<\/disabled>", "<disabled>true<\/disabled>", job_config_xml),
+                "sed -i '' -e 's/{}/{}/g' {}".format("<disabled>false<\/disabled>", "<disabled>true<\/disabled>", job_config_xml),
                 print_output=False,
                 check=False)
+            modified = True
+        if args.remove_single_slave:
+            downloader.run_cmd(
+                "sed -i '' -e 's/{}//g' {}".format('<org.jenkinsci.plugins.mesos.MesosSingleUseSlave plugin="mesos@[0-9.]*"\/>',
+                                                   job_config_xml),
+                print_output=False,
+                check=False)
+            modified = True
+        if modified:
             count = count + 1
+
     log.info('Processed "{}" jobs from "{}"'.format(count, folder))
 
 
@@ -196,20 +216,22 @@ def _is_job_folder(path: str) -> bool:
     return True
 
 
+# Returns source folder name and absolute target folder name that always starts with "/var/jenkins_home/jobs..."
 def _jobs_dir(jenkins_home: str, path: str) -> (str, str):
     folder_path = os.path.join(jenkins_home, "jobs")
+    var_jenkins_home = "/var/jenkins_home"
     if path == "*":
-        return folder_path, "/jobs/"
+        return folder_path, "{}/jobs/".format(var_jenkins_home)
     # Default to everything in the folder, but honor any specified relative path.
     # In file system we have <folder-name>/jobs/<sub-folder-name>/jobs/<job-name>/config.xml
     # In given path, "jobs" get replaced by "job" but everything else remains the same
     if path.startswith("job/"):
         path = "/" + path
     if not path.startswith("/job/"):
-        log.error("invalid path specified : {}".format(path))
+        log.fatal("invalid path specified : {}".format(path))
     path = path.replace("/job/", "/jobs/")
-    folder_path = os.path.join(jenkins_home, path)
-    return folder_path, path
+    folder_path = os.path.join(jenkins_home, path.lstrip("/"))
+    return folder_path, "{}{}".format(var_jenkins_home, path)
 
 
 def main():
@@ -234,6 +256,9 @@ def main():
     translator_cmd.add_argument("-c", "--config-file", type=str, default="./jenkins_home/config.xml", help="path of the config.xml file")
     translator_cmd.add_argument("-t", "--target-file", type=str, default="k8s.config.xml", help="path of the target config.xml file")
     translator_cmd.add_argument("-p", "--print", action='store_true', help="Print the transformed cloud config element from config.xml")
+    translator_cmd.add_argument("--namespace", type=str, default="jenkins", help="Namespace of the jenkins pod (defaults to jenkins)")
+    translator_cmd.add_argument("--fullname", type=str, default="jenkins", help="Name of the jenkins helm installation (defaults to jenkins)")
+    translator_cmd.add_argument("--uri-prefix", type=str, default="/jenkins", help="Uri prefix for jenkins chart (defaults to /jenkins)")
     translator_cmd.set_defaults(func=translate)
 
     # Step 3 : Optionally disable jobs and copy them
@@ -246,12 +271,14 @@ def main():
     jobs_update_cmd.add_argument("--path", type=str, default="*", help=job_path_help)
     jobs_update_cmd.add_argument("--disable-jobs", action='store_true',
                                  help='If set, the job config.xml is updated to disable the job by setting "<disabled>true</disabled>"')
+    jobs_update_cmd.add_argument("--remove-single-slave", action='store_true',
+                                 help='If set, the job config.xml is updated by removing the MesosSingleUseSlave build wrapper')
     jobs_update_cmd.set_defaults(func=jobs_update)
 
     # Step 3b: Copy jobs to kubernetes jenkins instance
     jobs_copy_cmd = jobs_helpers.add_parser("copy", parents=[parent_parser])
     jobs_copy_cmd.add_argument("--path", type=str, default="*", help=job_path_help)
-    jobs_copy_cmd.add_argument("--namespace", type=str, default="jenkins", help="Namespace of the jenkins pod (defaults to jenkins)")
+    jobs_copy_cmd.add_argument("--namespace", type=str, default="jenkins", help="Namespace of the jenkins installation (defaults to jenkins)")
     jobs_copy_cmd.add_argument("--release-name", type=str, default="jenkins", help="Helm release name (defaults to jenkins)")
     jobs_copy_cmd.add_argument("--dry-run", action='store_true',
                                help="Setting this flag would just print the commands without executing them")

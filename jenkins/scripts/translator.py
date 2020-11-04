@@ -10,9 +10,9 @@ log = logging.getLogger("translator")
 
 # Defaults with provided values.yaml
 # Update according to output of "helm2 list jenkins --output json" if needed
-JENKINS_FULL_NAME = os.getenv("JENKINS_FULL_NAME", "jenkins")
-JENKINS_NAMESPACE = os.getenv("JENKINS_NAMESPACE", "jenkins")
-JENKINS_URI_PREFIX = os.getenv("JENKINS_URI_PREFIX", "/jenkins")
+JENKINS_FULL_NAME = os.getenv("JENKINS_FULL_NAME")
+JENKINS_NAMESPACE = os.getenv("JENKINS_NAMESPACE")
+JENKINS_URI_PREFIX = os.getenv("JENKINS_URI_PREFIX")
 JENKINS_URL = "http://{}.{}.svc:8080{}".format(JENKINS_FULL_NAME, JENKINS_NAMESPACE, JENKINS_URI_PREFIX)
 JENKINS_TUNNEL = "jenkins-agent.{}:50000".format(JENKINS_NAMESPACE)
 

@@ -13,8 +13,10 @@ log = logging.getLogger("parser")
 logging.basicConfig(level=logging.INFO)
 
 
-def run_cmd(cmd: str, print_output: bool = False, check: bool = True, timeout_seconds: int = 300) -> [int, str, str]:
-    log.info('running command "{}"'.format(cmd, check))
+def run_cmd(cmd: str, print_output: bool = False, check: bool = True, timeout_seconds: int = 300, print_cmd: bool = False) -> [int, str, str]:
+    log.debug('running command "{}"'.format(cmd, check))
+    if print_cmd:
+        print(cmd)
     result = subprocess.run(
         [cmd],
         stdout=subprocess.PIPE,
