@@ -112,7 +112,7 @@ Jenkins.instance.pluginManager.plugins.each{
 '''
     print(separator)
     print('Create the following serviceaccount, roles, and rolebindings prior to running helm install:\n{}'.format(
-        "{} apply -f resources/serviceaccount.yaml --namespace jenkins".format(kubectl)
+        "{} apply -f ./jenkins/resources/serviceaccount.yaml --namespace jenkins".format(kubectl)
     ))
     print(separator)
     print('Use following values.yaml to install helm chart\ncat <<EOF >> values.yaml{}EOF'.format(
@@ -145,14 +145,13 @@ def translate(args):
     print(separator)
     print(
         'Create the following ConfigMap that will be used to mount the JNLP configuration script for your jenkins agents:\n{}'.format(
-            "{} apply -f resources/configmap-jenkins-agent-3-35-5.yaml --namespace {}".format(kubectl, args.namespace)))
+            "{} apply -f ./jenkins/resources/configmap-jenkins-agent-3-35-5.yaml --namespace {}".format(kubectl, args.namespace)))
     print(separator)
 
 
 def jobs_copy(args):
     abs_target_dir = os.path.abspath(args.target_dir)
     src_folder, target_folder = _jobs_dir(abs_target_dir, args.path)
-    print("abs target dir {} \n src_folder {} \n target_folder {}".format(abs_target_dir, src_folder, target_folder))
     ns = args.namespace
     _, name, _ = downloader.run_cmd(
         '{} get pods --namespace {} -l=app.kubernetes.io/instance={} --no-headers --output custom-columns=":metadata.name"'.format(
@@ -167,9 +166,9 @@ def jobs_copy(args):
         print("Execute the following commands to copy the jobs:")
         for c in cmds:
             print(c)
-    else:
-        for c in cmds:
-            downloader.run_cmd(c, print_output=True, print_cmd=True)
+        return
+    for c in cmds:
+        downloader.run_cmd(c, print_output=True, print_cmd=True)
 
 
 def jobs_update(args):
