@@ -4,10 +4,11 @@ import logging as log
 import os
 import shutil
 import sys
+
 from collections import namedtuple
 
 import backup
-import install
+import translate
 
 # KUBERNETES CLI
 kubectl = os.getenv("KUBECTL", "kubectl")
@@ -50,8 +51,7 @@ master:
   tag: {tag}
   useSecurity: false
   installPlugins:
-    - kubernetes:{kubernetes_plugin}
-  additionalPlugins: []
+  - kubernetes:{kubernetes_plugin}
   csrf:
     defaultCrumbIssuer:
       enabled: false
@@ -98,7 +98,8 @@ helm install jenkins \\
     jenkins
 '''
 
-    PLUGIN_SCRIPT = '''def skipPlugins = ["mesos", "metrics-graphite"]
+    PLUGIN_SCRIPT = '''
+def skipPlugins = ["mesos", "metrics-graphite"]
 Jenkins.instance.pluginManager.plugins.each{
   plugin ->
     name = plugin.getShortName()
@@ -112,11 +113,24 @@ Jenkins.instance.pluginManager.plugins.each{
         "{} apply -f ./jenkins/resources/serviceaccount.yaml --namespace jenkins".format(kubectl)
     ))
     print(separator)
-    print('Use following values.yaml to install helm chart\ncat <<EOF >> values.yaml{}EOF'.format(
-        GENERIC_VALUES.format(tag=ver.JENKINS_VERSION, kubernetes_plugin=ver.KUBERNETES_PLUGIN_VERSION)))
+    print('For migrating the plugins, go to "<jenkins-url>/script" and run the following script:\n{}\nto get a list of plugins '
+          'and paste the output here (type q or quit to skip this step):'.format(PLUGIN_SCRIPT))
+    plugins = []
+    while True:
+        line = sys.stdin.readline()
+        if not line.lstrip(" ").startswith("-"):
+            break
+        else:
+            plugins.append(line)
+    additionalPlugins = ""
+    if len(plugins) > 0:
+        plugins.insert(0, "  additionalPlugins:\n")  # MUST be prefixed by two spaces as indent
+        additionalPlugins = "  ".join(plugins)
+    else:
+        log.warning('Skipping installation of additional plugins. More plugins can be installed by setting "master.additionalPlugins" list in values.yaml')
     print(separator)
-    print('For migrating the plugins, go to "<jenkins-url>/script" and run the following script:\n\n{}\nto get a list of plugins '
-          'which can be added under "master.additionalPlugins" field in values.yaml'.format(PLUGIN_SCRIPT))
+    print('Use following values.yaml to install helm chart\ncat <<EOF >> values.yaml{}EOF'.format(
+        GENERIC_VALUES.format(tag=ver.JENKINS_VERSION, kubernetes_plugin=ver.KUBERNETES_PLUGIN_VERSION) + additionalPlugins))
     print(separator)
     print("Run the following command to install the chart:\nUsing helm v2:\n{}\nUsing helm v3:\n{}".format(
         HELM_2_CMD.format(version=ver.CHART_VERSION, namespace=namespace),
@@ -124,13 +138,13 @@ Jenkins.instance.pluginManager.plugins.each{
     print(separator)
 
 
-def installer(args):
+def install(args):
     print_instructions(args.namespace)
     log.info('Translating mesos config.xml to k8s config.xml from {} to {}'.format(args.config_file, args.target_file))
     os.environ["JENKINS_NAMESPACE"] = args.namespace
     os.environ["JENKINS_FULL_NAME"] = args.fullname
     os.environ["JENKINS_URI_PREFIX"] = args.uri_prefix
-    out = install.translate_mesos_to_k8s_config_xml(args.config_file, args.target_file)
+    out = translate.translate_mesos_to_k8s_config_xml(args.config_file, args.target_file)
     if args.print:
         log.info("Generated config.xml:\n{}\n{}\n{}".format(separator, out, separator))
     print(separator)
@@ -272,7 +286,7 @@ def main():
     install_cmd.add_argument("--fullname", type=str, default="jenkins",
                              help="Name of the jenkins helm installation (defaults to jenkins)")
     install_cmd.add_argument("--uri-prefix", type=str, default="/jenkins", help="Uri prefix for jenkins chart (defaults to /jenkins)")
-    install_cmd.set_defaults(func=installer)
+    install_cmd.set_defaults(func=install)
 
     # Step 3 : Optionally disable jobs and copy them
     migrate = subparsers.add_parser("jobs", help='Perform various operations on jobs')

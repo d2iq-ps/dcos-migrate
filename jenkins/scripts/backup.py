@@ -2,10 +2,10 @@ import logging as log
 import json
 import os
 import subprocess
-
-# DCOS CLI
 import sys
 
+
+# DCOS CLI
 DCOS = os.getenv("DCOS_CLI", "dcos")
 MARATHON_JSON = "marathon_app.json"
 
