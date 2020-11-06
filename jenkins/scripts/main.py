@@ -289,7 +289,7 @@ def main():
     install_cmd.set_defaults(func=install)
 
     # Step 3 : Optionally disable jobs and copy them
-    migrate = subparsers.add_parser("jobs", help='Perform various operations on jobs')
+    migrate = subparsers.add_parser("migrate", help='Perform various operations on jobs')
     jobs_helpers = migrate.add_subparsers(help="Perform various operations on jobs")
 
     # Step 3a: Optional : Disable jobs
