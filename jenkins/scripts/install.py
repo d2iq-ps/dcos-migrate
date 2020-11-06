@@ -123,80 +123,6 @@ ENV_VARS = """
 """
 
 
-def plugin20Transform(cloud):
-    # MesosAgentSpecTemplate in Mesos to PodTemplate in k8s
-    MESOS_20_TO_K8S_POD = {
-        "label": "label",
-        "mode": "nodeUsageMode",
-        "idleTerminationMinutes": "idleMinutes",
-        "maxExecutors": "containerCap",
-    }
-
-    # ContainerInfo in Mesos to ContainerTemplate in k8s
-    MESOS_20_TO_K8S_CONTAINER = {
-        "dockerImage": "image",
-        "dockerForcePullImage": "alwaysPullImage",
-    }
-    NAME = cloud.find("name").text
-
-    if NAME is None or len(NAME) == 0:
-        log.warning("Unnamed cloud found, skipping..")
-        return
-
-    INSTANCE_CAP = cloud.find("instanceCap").text
-
-    # Iterate over mesosAgentSpecTemplates
-    mesosAgentSpecTemplatesStr = "mesosAgentSpecTemplates"
-    specs = cloud.find(mesosAgentSpecTemplatesStr)
-    if len(specs) == 0:
-        log.warning(f"no {mesosAgentSpecTemplatesStr} found for cloud {NAME}")
-        return
-
-    podTemplates = []
-    for spec in specs:
-        # INSTANCE_CAP is the only field that is configured at Mesos Cloud level but is at K8S Pod Level.
-        pod_template_subs = {"INSTANCE_CAP": INSTANCE_CAP}
-        for mesos_field_name, k8s_field_name in MESOS_20_TO_K8S_POD.items():
-            field = spec.find(mesos_field_name).text
-            k8s_field_value = ""
-            if field is not None:
-                k8s_field_value = field.text
-            if len(k8s_field_value) == 0:
-                log.warning(f"Unable to substitute {k8s_field_name} in cloud named {NAME}")
-                return
-            pod_template_subs[k8s_field_name] = k8s_field_value
-
-        # There is a single containerInfo per Agent spec. Can there be more than 1 ? TODO
-        containerInfo = spec.find("containerInfo")
-        container_template_subs = {}
-        if len(containerInfo) == 0:
-            log.info("no containerInfo found, skipping...")
-        else:
-            for mesos_field_name, k8s_field_name in MESOS_20_TO_K8S_CONTAINER.items():
-                field = spec.find(f"./containerInfo/{mesos_field_name}")
-                k8s_field_value = ""
-                if field is not None:
-                    k8s_field_value = field.text
-                if len(k8s_field_value) == 0:
-                    log.warning(f"Unable to substitute {k8s_field_name} in cloud named {NAME}")
-                    continue
-                container_template_subs[k8s_field_name] = k8s_field_value
-            # Pod name and namespace can be left empty but container name needs to be set to non empty string.
-            # K8S plug in injects another container named "jnlp"
-            container_template_subs["CONTAINER_NAME"] = "jnlp"
-
-        pod_template_subs["CONTAINERS"] = Template(KUBERNETES_CONTAINER_TEMPLATE).substitute(container_template_subs)
-        podTemplates.append(Template(KUBERNETES_POD_TEMPLATE).substitute(pod_template_subs))
-
-    CLOUD_CONFIG = Template(KUBERNETES_CLOUD_TEMPLATE).substitute(
-        JENKINS_URL=JENKINS_URL,
-        JENKINS_TUNNEL=JENKINS_TUNNEL,
-        NAME=NAME,
-        POD_TEMPLATES='\n'.join(podTemplates)
-    )
-    return CLOUD_CONFIG
-
-
 def plugin100Transform(cloud) -> str:
     # slaveInfos in Mesos to PodTemplate in K8S
     MESOS_100_TO_K8S_POD = {
@@ -390,7 +316,6 @@ def translate_mesos_to_k8s_config_xml(src_file: str, target_file: str):
         JENKINS_URL)
     # Currently supported plugin versions
     SUPPORTED_VERSIONS = {
-        "mesos@2.0": plugin20Transform,
         "mesos@1.0.0": plugin100Transform,
     }
 
