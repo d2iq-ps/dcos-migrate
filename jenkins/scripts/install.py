@@ -1,12 +1,11 @@
 import os
 import xml.etree.ElementTree as ET
-import logging
+import logging as log
 import xml.dom.minidom
 
 from string import Template
 from xml.sax.saxutils import escape
 
-log = logging.getLogger("translator")
 
 # Kubernetes Cloud templates - EDIT ONLY IF YOU KNOW WHAT YOU ARE DOING!
 KUBERNETES_CLOUD_TEMPLATE = """
@@ -240,7 +239,7 @@ def plugin100Transform(cloud) -> str:
             msg = f'{msg} with label "{label.text}"'
         else:
             msg = f'{msg} with empty label'
-        log.info("processing {}".format(msg))
+        log.info("Processing {}".format(msg))
 
         # There MUST be containerInfo in Agent spec. If not, it points to UCR runtime and we can't transform
         containerInfo = slave_info.find("containerInfo")
@@ -293,10 +292,10 @@ def plugin100Transform(cloud) -> str:
         # Loss of information for "additionalURIs" at slaveInfo level and "parameters" at "containerInfo" level
         for item in ["additonalURIs"]:
             if slave_info.find(item) is not None:
-                log.warning(f"dropping {item} found in {msg}")
+                log.warning(f"Dropping {item} found in {msg}")
         for item in ["parameters"]:
             if containerInfo.find(item) is not None:
-                log.warning(f"dropping {item} found in {msg}")
+                log.warning(f"Dropping {item} found in {msg}")
 
         # Map network type. HOST networking is bool variable at pod level.
         # If Bridge is selected, inject the port mappings at container level.
@@ -304,14 +303,14 @@ def plugin100Transform(cloud) -> str:
         pod_template_subs["hostNetwork"] = "false"  # default value gets overridden below
         container_template_subs["ports"] = ""  # default value gets overridden below
         if networking is None:
-            log.info("networking not found in containerInfo")
+            log.info('Element "networking" not found in "containerInfo"')
         else:
             networkType = networking.text
             container_template_subs["networking"] = networking
             if networkType == "BRIDGE":
                 mesos_port_mappings = containerInfo.find(f"./portMappings")
                 if mesos_port_mappings is None or len(mesos_port_mappings) == 0:
-                    log.info("no portMappings found in BRIDGE mode")
+                    log.info("No portMappings found in BRIDGE mode")
                 else:
                     k8s_port_mappings = []
                     for port_mapping in mesos_port_mappings:
@@ -325,7 +324,7 @@ def plugin100Transform(cloud) -> str:
             elif networkType == "HOST":
                 pod_template_subs["hostNetwork"] = "true"
             elif networkType == "USER":
-                log.warning("networking type USER not supported in k8s")
+                log.warning('Element "networking" of type "USER" not supported in k8s')
             else:
                 log.warning("Invalid value for networking : {}".format(networkType))
 

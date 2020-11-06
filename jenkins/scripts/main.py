@@ -1,19 +1,16 @@
 import argparse
 import contextlib
-import logging
+import logging as log
 import os
 import shutil
 import sys
 from collections import namedtuple
 
-import translator
-import downloader
+import backup
+import install
 
 # KUBERNETES CLI
 kubectl = os.getenv("KUBECTL", "kubectl")
-
-log = logging.getLogger("root")
-logging.basicConfig(level=logging.WARN, format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s', )
 
 # Edit/Update as needed
 Mapping = namedtuple("Mapping", ["DCOS_VERSION", "JENKINS_VERSION", "KUBERNETES_PLUGIN_VERSION", "CHART_VERSION"])
@@ -25,8 +22,8 @@ separator = "--------------------------------------------------"
 # Return the downloaded package version
 def download(args) -> str:
     log.info('Downloading DC/OS package with marathon app id {} into target directory {}'.format(args.app_id, args.target_dir))
-    pkg_ver, task_id = downloader.download_dcos_package(args.app_id, args.target_dir, [versions[0][0]])
-    downloader.download_task_data(task_id, args.target_dir, args.retain_builds, args.retain_next_build_number)
+    pkg_ver, task_id = backup.download_dcos_package(args.app_id, args.target_dir, [versions[0][0]])
+    backup.download_task_data(task_id, args.target_dir)
 
     if args.retain_builds and args.retain_next_build_number:
         return pkg_ver
@@ -127,20 +124,22 @@ Jenkins.instance.pluginManager.plugins.each{
     print(separator)
 
 
-def translate(args):
+def installer(args):
     print_instructions(args.namespace)
     log.info('Translating mesos config.xml to k8s config.xml from {} to {}'.format(args.config_file, args.target_file))
     os.environ["JENKINS_NAMESPACE"] = args.namespace
     os.environ["JENKINS_FULL_NAME"] = args.fullname
     os.environ["JENKINS_URI_PREFIX"] = args.uri_prefix
-    out = translator.translate_mesos_to_k8s_config_xml(args.config_file, args.target_file)
+    out = install.translate_mesos_to_k8s_config_xml(args.config_file, args.target_file)
     if args.print:
-        log.info("Generated config.xml\n======\n{}".format(out))
+        log.info("Generated config.xml:\n{}\n{}\n{}".format(separator, out, separator))
     print(separator)
-    pod_name_cmd = '{} get pods --namespace {} -l=app.kubernetes.io/instance=jenkins --no-headers --output custom-columns=":metadata.name"'.format(kubectl, args.namespace)
+    pod_name_cmd = '{} get pods --namespace {} -l=app.kubernetes.io/instance=jenkins --no-headers --output custom-columns=":metadata.name"'.format(
+        kubectl, args.namespace)
     print('Copy the generated "{}" to Jenkins master node on kubernetes using command :\n{}'.format(
         args.target_file,
-        "{} cp {} $({}):/var/jenkins_home/config.xml --namespace {} --container jenkins".format(kubectl, args.target_file, pod_name_cmd, args.namespace)
+        "{} cp {} $({}):/var/jenkins_home/config.xml --namespace {} --container jenkins".format(kubectl, args.target_file, pod_name_cmd,
+                                                                                                args.namespace)
     ))
     print(separator)
     print(
@@ -153,12 +152,13 @@ def jobs_copy(args):
     abs_target_dir = os.path.abspath(args.target_dir)
     src_folder, target_folder = _jobs_dir(abs_target_dir, args.path)
     ns = args.namespace
-    _, name, _ = downloader.run_cmd(
+    _, name, _ = backup.run_cmd(
         '{} get pods --namespace {} -l=app.kubernetes.io/instance={} --no-headers --output custom-columns=":metadata.name"'.format(
             kubectl, ns, args.release_name), check=True)
     cmds = [
         '{} exec {} --namespace {} --container jenkins -- sh -c "mkdir -p {}"'.format(kubectl, name, ns, target_folder),
-        '{} --namespace {} --container jenkins cp {} {}:{}'.format(kubectl, ns, src_folder, name, os.path.dirname(target_folder.rstrip("/")))
+        '{} --namespace {} --container jenkins cp {} {}:{}'.format(kubectl, ns, src_folder, name,
+                                                                   os.path.dirname(target_folder.rstrip("/")))
     ]
 
     # Print or execute each command.
@@ -168,7 +168,7 @@ def jobs_copy(args):
             print(c)
         return
     for c in cmds:
-        downloader.run_cmd(c, print_output=True, print_cmd=True)
+        backup.run_cmd(c, print_output=True, print_cmd=True)
 
 
 def jobs_update(args):
@@ -184,19 +184,20 @@ def jobs_update(args):
             continue
         modified = False
         if args.disable_jobs:
-            downloader.run_cmd(
+            backup.run_cmd(
                 "sed -i '' -e 's/{}/{}/g' {}".format("<disabled>false<\/disabled>", "<disabled>true<\/disabled>", job_config_xml),
                 print_output=False,
                 check=False)
             modified = True
         if args.remove_single_slave:
-            downloader.run_cmd(
+            backup.run_cmd(
                 "sed -i '' -e 's/{}//g' {}".format('<org.jenkinsci.plugins.mesos.MesosSingleUseSlave plugin="mesos@[0-9.]*"\/>',
                                                    job_config_xml),
                 print_output=False,
                 check=False)
             modified = True
         if modified:
+            log.info("Processed job {}".format(dirpath.replace("/jobs/", "/job/")))
             count = count + 1
 
     log.info('Processed "{}" jobs from "{}"'.format(count, folder))
@@ -229,61 +230,73 @@ def _jobs_dir(jenkins_home: str, path: str) -> (str, str):
     if path.startswith("job/"):
         path = "/" + path
     if not path.startswith("/job/"):
-        log.fatal("invalid path specified : {}".format(path))
+        log.fatal("Invalid path specified : {}".format(path))
     path = path.replace("/job/", "/jobs/")
     folder_path = os.path.join(jenkins_home, path.lstrip("/"))
     return folder_path, "{}{}".format(var_jenkins_home, path)
 
 
 def main():
+    log.basicConfig(level=log.INFO, format='[%(asctime)s] %(levelname)5s {%(filename)s:%(lineno)d} - %(message)s')
+
+    class ShutdownHandler(log.Handler):
+        def emit(self, record):
+            log.shutdown()
+            sys.exit(1)
+
+    log.getLogger().addHandler(ShutdownHandler(level=50))
+
     # Dummy parent parser to share common global level args
     parent_parser = argparse.ArgumentParser(add_help=False)
     parent_parser.add_argument("-t", "--target-dir", type=str, default="./jenkins_home",
                                help='points to jenkins_home folder with a valid "jobs" folder')
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--version', action='version', version='0.0.1-dev')
     subparsers = parser.add_subparsers(help='sub-commands available')
 
-    # Step 1 : Download the DC/OS Jenkins task data
-    downloader_cmd = subparsers.add_parser("download", help='Download the DC/OS package data', parents=[parent_parser])
-    downloader_cmd.add_argument("--app-id", type=str, default="jenkins", help="Marathon application ID")
-    downloader_cmd.add_argument("--retain-builds", action='store_true', help="Set to retain previous builds data")
-    downloader_cmd.add_argument("--retain-next-build-number", action='store_true', help='Set to retain nextBuildNumber counter')
-    downloader_cmd.set_defaults(func=download)
+    # Step 1 : Backup the DC/OS Jenkins task data
+    backup_cmd = subparsers.add_parser("backup", help='Backup the DC/OS package data', parents=[parent_parser])
+    backup_cmd.add_argument("--app-id", type=str, default="jenkins", help="Marathon application ID")
+    backup_cmd.add_argument("--retain-builds", action='store_true', help="Set to retain previous builds data")
+    backup_cmd.add_argument("--retain-next-build-number", action='store_true', help='Set to retain nextBuildNumber counter')
+    backup_cmd.set_defaults(func=download)
 
-    # Step 2 : Migrate the config.xml from DC/OS Jenkins format to Kubernetes Jenkins format
-    translator_cmd = subparsers.add_parser("translate",
-                                           help='Translate the MesosCloud based config.xml to KubernetesCloud based config.xml')
-    translator_cmd.add_argument("-c", "--config-file", type=str, default="./jenkins_home/config.xml", help="path of the config.xml file")
-    translator_cmd.add_argument("-t", "--target-file", type=str, default="k8s.config.xml", help="path of the target config.xml file")
-    translator_cmd.add_argument("-p", "--print", action='store_true', help="Print the transformed cloud config element from config.xml")
-    translator_cmd.add_argument("--namespace", type=str, default="jenkins", help="Namespace of the jenkins pod (defaults to jenkins)")
-    translator_cmd.add_argument("--fullname", type=str, default="jenkins", help="Name of the jenkins helm installation (defaults to jenkins)")
-    translator_cmd.add_argument("--uri-prefix", type=str, default="/jenkins", help="Uri prefix for jenkins chart (defaults to /jenkins)")
-    translator_cmd.set_defaults(func=translate)
+    # Step 2 : Migrate the config.xml from DC/OS Jenkins format to Kubernetes Jenkins format and print install instructions
+    install_cmd = subparsers.add_parser("install",
+                                        help='Translate the MesosCloud based config.xml to KubernetesCloud based config.xml and print install instructions ')
+    install_cmd.add_argument("-c", "--config-file", type=str, default="./jenkins_home/config.xml", help="path of the config.xml file")
+    install_cmd.add_argument("-t", "--target-file", type=str, default="k8s.config.xml", help="path of the target config.xml file")
+    install_cmd.add_argument("-p", "--print", action='store_true', help="Print the transformed cloud config element from config.xml")
+    install_cmd.add_argument("--namespace", type=str, default="jenkins", help="Namespace of the jenkins pod (defaults to jenkins)")
+    install_cmd.add_argument("--fullname", type=str, default="jenkins",
+                             help="Name of the jenkins helm installation (defaults to jenkins)")
+    install_cmd.add_argument("--uri-prefix", type=str, default="/jenkins", help="Uri prefix for jenkins chart (defaults to /jenkins)")
+    install_cmd.set_defaults(func=installer)
 
     # Step 3 : Optionally disable jobs and copy them
-    jobs = subparsers.add_parser("jobs", help='Perform various operations on jobs')
-    jobs_helpers = jobs.add_subparsers(help="Perform various operations on jobs")
+    migrate = subparsers.add_parser("jobs", help='Perform various operations on jobs')
+    jobs_helpers = migrate.add_subparsers(help="Perform various operations on jobs")
 
     # Step 3a: Optional : Disable jobs
     job_path_help = "URL of the job or folder. This is the part after http://<cluster-url>/service/<service-name>/<job-path-here>"
-    jobs_update_cmd = jobs_helpers.add_parser("update", parents=[parent_parser])
-    jobs_update_cmd.add_argument("--path", type=str, default="*", help=job_path_help)
-    jobs_update_cmd.add_argument("--disable-jobs", action='store_true',
-                                 help='If set, the job config.xml is updated to disable the job by setting "<disabled>true</disabled>"')
-    jobs_update_cmd.add_argument("--remove-single-slave", action='store_true',
-                                 help='If set, the job config.xml is updated by removing the MesosSingleUseSlave build wrapper')
-    jobs_update_cmd.set_defaults(func=jobs_update)
+    migrate_jobs_update_cmd = jobs_helpers.add_parser("update", parents=[parent_parser],
+                                                      help="Update the jobs by removing the mesos related build wrappers and optionally disable the jobs")
+    migrate_jobs_update_cmd.add_argument("--path", type=str, default="*", help=job_path_help)
+    migrate_jobs_update_cmd.add_argument("--disable-jobs", action='store_true',
+                                         help='If set, the job config.xml is updated to disable the job by setting "<disabled>true</disabled>"')
+    migrate_jobs_update_cmd.set_defaults(func=jobs_update)
 
     # Step 3b: Copy jobs to kubernetes jenkins instance
-    jobs_copy_cmd = jobs_helpers.add_parser("copy", parents=[parent_parser])
-    jobs_copy_cmd.add_argument("--path", type=str, default="*", help=job_path_help)
-    jobs_copy_cmd.add_argument("--namespace", type=str, default="jenkins", help="Namespace of the jenkins installation (defaults to jenkins)")
-    jobs_copy_cmd.add_argument("--release-name", type=str, default="jenkins", help="Helm release name (defaults to jenkins)")
-    jobs_copy_cmd.add_argument("--dry-run", action='store_true',
-                               help="Setting this flag would just print the commands without executing them")
-    jobs_copy_cmd.set_defaults(func=jobs_copy)
+    migrate_jobs_copy_cmd = jobs_helpers.add_parser("copy", parents=[parent_parser],
+                                                    help="Copy the jobs from local file system to Jenkins master node")
+    migrate_jobs_copy_cmd.add_argument("--path", type=str, default="*", help=job_path_help)
+    migrate_jobs_copy_cmd.add_argument("--namespace", type=str, default="jenkins",
+                                       help="Namespace of the jenkins installation (defaults to jenkins)")
+    migrate_jobs_copy_cmd.add_argument("--release-name", type=str, default="jenkins", help="Helm release name (defaults to jenkins)")
+    migrate_jobs_copy_cmd.add_argument("--dry-run", action='store_true',
+                                       help="Setting this flag would just print the commands without executing them")
+    migrate_jobs_copy_cmd.set_defaults(func=jobs_copy)
 
     args = parser.parse_args()
     if len(sys.argv) == 1:
