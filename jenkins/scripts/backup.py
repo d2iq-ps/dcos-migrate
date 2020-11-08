@@ -35,7 +35,7 @@ def run_cmd(cmd: str, print_output: bool = False, check: bool = True, timeout_se
         if result.stderr:
             stderr = result.stderr.decode(encoding).strip()
 
-        if result.returncode != 0:
+        if print_output and result.returncode != 0:
             log.info("Got exit code {} to command: {}".format(result.returncode, cmd))
 
         if print_output:

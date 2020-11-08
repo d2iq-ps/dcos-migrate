@@ -203,13 +203,11 @@ def jobs_update(args):
                 print_output=False,
                 check=False)
             modified = True
-        if args.remove_single_slave:
-            backup.run_cmd(
-                "sed -i '' -e 's/{}//g' {}".format('<org.jenkinsci.plugins.mesos.MesosSingleUseSlave plugin="mesos@[0-9.]*"\/>',
-                                                   job_config_xml),
-                print_output=False,
-                check=False)
-            modified = True
+        backup.run_cmd(
+            "sed -i '' -e 's/{}//g' {}".format('<org.jenkinsci.plugins.mesos.MesosSingleUseSlave plugin="mesos@[0-9.]*"\/>',
+                                               job_config_xml),
+            print_output=False,
+            check=False)
         if modified:
             log.info("Processed job {}".format(dirpath.replace("/jobs/", "/job/")))
             count = count + 1
