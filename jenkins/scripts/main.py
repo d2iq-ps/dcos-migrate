@@ -203,13 +203,11 @@ def jobs_update(args):
                 print_output=False,
                 check=False)
             modified = True
-        if args.remove_single_slave:
-            backup.run_cmd(
-                "sed -i '' -e 's/{}//g' {}".format('<org.jenkinsci.plugins.mesos.MesosSingleUseSlave plugin="mesos@[0-9.]*"\/>',
-                                                   job_config_xml),
-                print_output=False,
-                check=False)
-            modified = True
+        backup.run_cmd(
+            "sed -i '' -e 's/{}//g' {}".format('<org.jenkinsci.plugins.mesos.MesosSingleUseSlave plugin="mesos@[0-9.]*"\/>',
+                                               job_config_xml),
+            print_output=False,
+            check=False)
         if modified:
             log.info("Processed job {}".format(dirpath.replace("/jobs/", "/job/")))
             count = count + 1
@@ -289,7 +287,7 @@ def main():
     install_cmd.set_defaults(func=install)
 
     # Step 3 : Optionally disable jobs and copy them
-    migrate = subparsers.add_parser("jobs", help='Perform various operations on jobs')
+    migrate = subparsers.add_parser("migrate", help='Perform various operations on jobs')
     jobs_helpers = migrate.add_subparsers(help="Perform various operations on jobs")
 
     # Step 3a: Optional : Disable jobs
