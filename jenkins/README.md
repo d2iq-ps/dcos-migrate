@@ -32,6 +32,7 @@ optional arguments:
   --version             show program's version number and exit
 ``` 
 
+### Overview 
 At a higher level, migration can be seen as three steps:
 
 1. Backup the DC/OS Jenkins configuration, app definition, jobs locally.
@@ -40,7 +41,7 @@ At a higher level, migration can be seen as three steps:
 
 These steps are explained in following steps:
 
-### `backup`
+### `1.backup`
 
 By providing a marathon app-id (defaults to `/jenkins`), all the configuration and jobs related data can be downloaded to local file system.
 
@@ -62,7 +63,8 @@ optional arguments:
 
 `TARGET_DIR` defaults to `$(pwd)/jenkins_home` and the tooling removes the builds directory by default.
 
-### `install`
+### `2.install`
+The `install` command generates a `TARGET_FILE` (that defaults to `$(pwd)/k8s.config.xml` ) and prints instructions on how to use it to install in Jenkins on Konvoy. Other parameters such as `namespace` and `fullname` have sensible defaults in accordance with the upstream helm chart but can be customized.
 
 ```
 ➜ python3 ./jenkins/scripts/main.py install --help
@@ -86,9 +88,11 @@ optional arguments:
                         Uri prefix for jenkins chart (defaults to /jenkins)
 ```                        
 
-The `install` command generates a `TARGET_FILE` (that defaults to `$(pwd)/k8s.config.xml` ) and prints instructions on how to use it to install in Jenkins on Konvoy. Other parameters such as `namespace` and `fullname` have sensible defaults in accordance with the upstream helm chart but can be customized.
 
-### `migrate`
+
+### `3.migrate`
+
+The `migrate` command has two subcommands `update` and `copy` which update the jobs and then copies them to Jenkins on Kubernetes.
 
 ```
 ➜ python3 ./jenkins/scripts/main.py migrate --help
@@ -104,9 +108,11 @@ optional arguments:
   -h, --help     show this help message and exit
 ```
 
-The `migrate` command has two subcommands `update` and `copy` which update the jobs and then copies them to Jenkins on Kubernetes.
 
-#### `update`
+#### `3a.update`
+
+
+This command updates the jobs by optionally disabling the jobs. This is useful during migration of multiple jobs and the user wants to enable them manually one by one. This command also performs some other cleanup on the job definitions (such as cleaning up MesosSingleUseSlave flag which does not make any sense in the Jenkins on Konvoy)
 
 ```
 ➜ python3 ./jenkins/scripts/main.py migrate update --help
@@ -125,9 +131,10 @@ optional arguments:
                         job by setting "<disabled>true</disabled>"
 ```
 
-This command updates the jobs by optionally disabling the jobs. This is useful during migration of multiple jobs and the user wants to enable them manually one by one. This command also performs some other cleanup on the job definitions (such as cleaning up MesosSingleUseSlave flag which does not make any sense in the Jenkins on Konvoy)
 
-#### `copy`
+#### `3b.copy`
+
+This command copies the job from user file system to the Jenkins master node filesystem.
 
 ```
 ➜ python3 ./jenkins/scripts/main.py migrate copy --help
@@ -152,7 +159,6 @@ optional arguments:
                         without executing them
 ```
 
-This command copies the job from user file system to the Jenkins master node filesystem.
 
 
 ### Sample Output
@@ -341,7 +347,6 @@ Use following values.yaml to install helm chart
 cat <<EOF >> values.yaml
 master:
   tag: 2.190.1
-  useSecurity: false
   installPlugins:
   - kubernetes:1.24.1
   csrf:
@@ -361,10 +366,9 @@ master:
     path: /jenkins
     annotations:
       kubernetes.io/ingress.class: traefik
-  JCasC:
-    sidecars:
-      configAutoReload:
-        enabled: false
+  sidecars:
+    configAutoReload:
+      enabled: false
   additionalPlugins:
   - ace-editor:1.1
   - ansicolor:0.7.0
