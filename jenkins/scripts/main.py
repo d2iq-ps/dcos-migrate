@@ -49,7 +49,6 @@ def print_instructions(namespace: str, ver: Mapping = versions[0]):  # TODO: sup
     GENERIC_VALUES = '''
 master:
   tag: {tag}
-  useSecurity: false
   installPlugins:
   - kubernetes:{kubernetes_plugin}
   csrf:
@@ -69,10 +68,9 @@ master:
     path: /jenkins
     annotations:
       kubernetes.io/ingress.class: traefik
-  JCasC:
-    sidecars:
-      configAutoReload:
-        enabled: false
+  sidecars:
+    configAutoReload:
+      enabled: false
 '''
     HELM_2_CMD = '''
 helm install \\
