@@ -30,11 +30,10 @@ class DCOSSecretsService:
         r.raise_for_status()
         return r.json()['array']
 
-    def get(self, path: str, key: str = '') -> Dict[str, str]:
-        # There are two types of secrets: text and binary.
-        # All secrets can be retrieved as `application/octet-stream` but we
-        # lose the information about which type they are. First try retrieving
-        # as `application/json` which only works for text secrets.
+    def get(self, path: str, key: str) -> Dict[str, str]:
+        # There are two types of secrets: text and binary.  Using `Accept: */*`
+        # the returned `Content-Type` will be `application/octet-stream` for
+        # binary secrets and `application/json` for text secrets.
         #
         # Returns the secret as:
         # {
@@ -49,27 +48,23 @@ class DCOSSecretsService:
         )
         r = requests.get(
             url,
-            headers={'Authorization': self.auth, 'Accept': 'application/json'},
+            headers={'Authorization': self.auth, 'Accept': '*/*'},
             verify=False,
         )
-        if r.status_code == 400:
-            r = requests.get(
-                url,
-                headers={'Authorization': self.auth, 'Accept': 'application/octet-stream'},
-                verify=False,
-            )
-            r.raise_for_status()
+        r.raise_for_status()
+        content_type = r.headers['Content-Type']
+        if content_type == 'application/octet-stream':
             response = {
                 'type': 'binary',
-                'value': base64.standard_b64encode(r.content).decode('ascii')
+                'value': base64.b64encode(r.content).decode('ascii')
             }
         else:
-            r.raise_for_status()
+            assert content_type == 'application/json', content_type
             response = r.json()
             response['type'] = 'text'
-            # We always encode the secret as base64, even when it is safe UTF-8 text.
+            # Always encode the secret as base64, even when it is safe UTF-8 text.
             # This obscures the values to prevent unintentional exposure.
-            response['value'] = base64.standard_b64encode(response['value'].encode('utf-8')).decode('ascii')
+            response['value'] = base64.b64encode(response['value'].encode('utf-8')).decode('ascii')
         # Always add the `path` and `key` values to the JSON response
         response['path'] = path
         response['key'] = key
@@ -107,11 +102,11 @@ def get_dcos_url(dcos_cli: str) -> str:
 
 def run(argv: List[str]) -> None:
     parser = argparse.ArgumentParser(description='Backup secrets from DC/OS secrets service.')
-    parser.add_argument('--path', dest='path', default='', help='secrets path')
+    parser.add_argument('--path', default='', help='secrets namespace to export')
     parser.add_argument('--target-file', default=None, help="path of the target file")
 
     args = parser.parse_args(argv)
-    folder = args.path
+    path = args.path
 
     url = get_dcos_url(DCOS)
     token = get_dcos_token(DCOS)
@@ -119,8 +114,8 @@ def run(argv: List[str]) -> None:
 
     s = DCOSSecretsService(url, token, trust)
     secrets = []
-    for key in s.list(folder):
-        secrets.append(s.get(folder, key))
+    for key in s.list(path):
+        secrets.append(s.get(path, key))
 
     if args.target_file is None:
         f = sys.stdout

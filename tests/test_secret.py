@@ -115,25 +115,25 @@ class TestSecrets:
         assert response['path'] == ''
         assert response['key'] == 'key1'
         assert response['type'] == 'text'
-        assert base64.standard_b64decode(response['value']).decode('utf-8') == value1
+        assert base64.b64decode(response['value']).decode('utf-8') == value1
 
         response = s.get('', 'folder/key2')
         assert response['path'] == ''
         assert response['key'] == 'folder/key2'
         assert response['type'] == 'text'
-        assert base64.standard_b64decode(response['value']).decode('utf-8') == value2
+        assert base64.b64decode(response['value']).decode('utf-8') == value2
 
         response = s.get('', 'folder/key3')
         assert response['path'] == ''
         assert response['key'] == 'folder/key3'
         assert response['type'] == 'binary'
-        assert base64.standard_b64decode(response['value']) == value3
+        assert base64.b64decode(response['value']) == value3
 
         response = s.get('', 'folder/sub/key4')
         assert response['path'] == ''
         assert response['key'] == 'folder/sub/key4'
         assert response['type'] == 'text'
-        assert json.loads(base64.standard_b64decode(response['value'])) == {
+        assert json.loads(base64.b64decode(response['value'])) == {
             "login_endpoint": "https://leader.mesos/acs/api/v1/auth/login",
             "private_key": PRIVATE_KEY,
             "scheme": "RS256",
@@ -144,19 +144,19 @@ class TestSecrets:
         assert response['path'] == 'folder'
         assert response['key'] == 'key2'
         assert response['type'] == 'text'
-        assert base64.standard_b64decode(response['value']).decode('utf-8') == value2
+        assert base64.b64decode(response['value']).decode('utf-8') == value2
 
         response = s.get('folder', 'key3')
         assert response['path'] == 'folder'
         assert response['key'] == 'key3'
         assert response['type'] == 'binary'
-        assert base64.standard_b64decode(response['value']) == value3
+        assert base64.b64decode(response['value']) == value3
 
         response = s.get('folder', 'sub/key4')
         assert response['path'] == 'folder'
         assert response['key'] == 'sub/key4'
         assert response['type'] == 'text'
-        assert json.loads(base64.standard_b64decode(response['value'])) == {
+        assert json.loads(base64.b64decode(response['value'])) == {
             "login_endpoint": "https://leader.mesos/acs/api/v1/auth/login",
             "private_key": PRIVATE_KEY,
             "scheme": "RS256",
@@ -167,7 +167,7 @@ class TestSecrets:
         assert response['path'] == 'folder/sub'
         assert response['key'] == 'key4'
         assert response['type'] == 'text'
-        assert json.loads(base64.standard_b64decode(response['value'])) == {
+        assert json.loads(base64.b64decode(response['value'])) == {
             "login_endpoint": "https://leader.mesos/acs/api/v1/auth/login",
             "private_key": PRIVATE_KEY,
             "scheme": "RS256",
