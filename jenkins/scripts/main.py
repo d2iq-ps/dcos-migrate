@@ -15,7 +15,9 @@ kubectl = os.getenv("KUBECTL", "kubectl")
 
 # Edit/Update as needed
 Mapping = namedtuple("Mapping", ["DCOS_VERSION", "JENKINS_VERSION", "KUBERNETES_PLUGIN_VERSION", "CHART_VERSION"])
-versions = [Mapping("3.6.0-2.190.1", "2.190.1", "1.24.1", "2.6.4")]  # TODO support more versions
+versions = [
+    Mapping("3.6.1-2.190.1", "2.190.1", "1.24.1", "2.6.4"),
+    Mapping("3.6.0-2.190.1", "2.190.1", "1.24.1", "2.6.4")]  # TODO support more versions
 
 separator = "--------------------------------------------------"
 
@@ -45,7 +47,7 @@ def download(args) -> str:
     return pkg_ver
 
 
-def print_instructions(namespace: str, ver: Mapping = versions[0]):  # TODO: support more versions
+def print_instructions(namespace: str, ver: Mapping = versions[1]):  # TODO: automate support for more versions
     GENERIC_VALUES = '''
 master:
   tag: {tag}
