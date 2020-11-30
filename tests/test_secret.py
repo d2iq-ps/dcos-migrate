@@ -1,6 +1,5 @@
 import base64
 import json
-import os
 import stat
 import subprocess
 from pathlib import Path
@@ -130,24 +129,36 @@ class TestSecrets:
             value2 = 'value2\n'
             secret2 = tmp_path / 'file2'
             secret2.write_text(value2)
-            cli.exec_command(
-                ['dcos', 'security', 'secrets', 'create', '--text-file', str(secret2), 'folder/key2']
-            )
+            cli.exec_command([
+                'dcos',
+                'security',
+                'secrets',
+                'create',
+                '--text-file',
+                str(secret2),
+                'folder/key2'
+            ])
 
             # folder/key3: value3 (binary)
             value3 = b'value\x85\xff3'
             secret3 = tmp_path / 'file3'
             secret3.write_bytes(value3)
-            cli.exec_command(
-                ['dcos', 'security', 'secrets', 'create', '--file', str(secret3), 'folder/key3']
-            )
+            cli.exec_command([
+                'dcos', 'security', 'secrets', 'create', '--file', str(secret3), 'folder/key3'
+            ])
 
             # folder/sub/key4: sa-account-details
             secret4 = tmp_path / 'file.pem'
             secret4.write_text(PRIVATE_KEY)
-            cli.exec_command(
-                ['dcos', 'security', 'secrets', 'create-sa-secret', str(secret4), 'dcos-service', 'folder/sub/key4']
-            )
+            cli.exec_command([
+                'dcos',
+                'security',
+                'secrets',
+                'create-sa-secret',
+                str(secret4),
+                'dcos-service',
+                'folder/sub/key4'
+            ])
 
             url = backup.get_dcos_url(cli.path)
             token = backup.get_dcos_token(cli.path)
@@ -260,7 +271,9 @@ class TestSecrets:
 
         k8s_secret_name = 'mysecrets'
         k8sfile = tmp_path / 'output-1k'
-        migrate.run(['--input', str(dcosfile1), '--output', str(k8sfile), '--name', k8s_secret_name])
+        migrate.run([
+            '--input', str(dcosfile1), '--output', str(k8sfile), '--name', k8s_secret_name
+        ])
         assert stat.S_IMODE(k8sfile.stat().st_mode) == 0o600
         with k8sfile.open() as f:
             response = json.load(f)
@@ -304,6 +317,8 @@ class TestSecrets:
                 stderr=subprocess.STDOUT,
                 check=True
             )
-            assert base64.b64decode(p.stdout.decode('ascii')).encode('utf-8') == value1
+            assert base64.b64decode(p.stdout.decode('ascii')).decode('utf-8') == value1
         finally:
-            subprocess.run([str(kind_path), 'delete', 'cluster', '--kubeconfig', str(kubeconfig_path)])
+            subprocess.run([
+                str(kind_path), 'delete', 'cluster', '--kubeconfig', str(kubeconfig_path)
+            ])
