@@ -1,6 +1,8 @@
 import base64
 import json
+import random
 import stat
+import string
 import subprocess
 from pathlib import Path
 
@@ -78,42 +80,23 @@ class TestSecrets:
 
         with Cluster(cluster_backend=docker_backend, agents=0, public_agents=0) as cluster:
             master = next(iter(cluster.masters))
-            c = {
-                **cluster.base_config,
-                **config,
-            }
-            print('X1c', c)
             cluster.install_dcos_from_path(
                 dcos_installer=artifact_path,
-                dcos_config=c,
+                dcos_config={
+                    **cluster.base_config,
+                    **config,
+                },
                 output=Output.LOG_AND_CAPTURE,
                 ip_detect_path=docker_backend.ip_detect_path,
             )
 
-            done = False
-            while not done:
-                try:
-                    wait_for_dcos_ee(
-                        cluster=cluster,
-                        superuser_username=superuser_username,
-                        superuser_password=superuser_password,
-                        request=request,
-                        log_dir=log_dir,
-                    )
-                    done = True
-                except json.decoder.JSONDecodeError:
-                    # File is not written atomically, so JSON parse can fail
-                    config_result = master.run(
-                        args=['cat', '/opt/mesosphere/etc/bootstrap-config.json'],
-                    )
-                    print('X2', config_result.stdout.decode())
-                    wait_for_dcos_ee(
-                        cluster=cluster,
-                        superuser_username=superuser_username,
-                        superuser_password=superuser_password,
-                        request=request,
-                        log_dir=log_dir,
-                    )
+            wait_for_dcos_ee(
+                cluster=cluster,
+                superuser_username=superuser_username,
+                superuser_password=superuser_password,
+                request=request,
+                log_dir=log_dir,
+            )
 
             master_url = 'https://' + str(master.public_ip_address)
 
@@ -280,8 +263,19 @@ class TestSecrets:
         keys = response['data'].keys()
         assert keys == {'key1', 'folder.key2', 'folder.key3', 'folder.sub.key4'}
 
+        kind_name = ''.join(random.choice(string.ascii_lowercase) for x in range(4))
+        kind_context = 'kind-{}'.format(kind_name)
+
         kubeconfig_path = tmp_path / 'kubeconfig'
-        subprocess.run([str(kind_path), 'create', 'cluster', '--kubeconfig', str(kubeconfig_path)])
+        subprocess.run([
+            str(kind_path),
+            'create',
+            'cluster',
+            '--name',
+            kind_name,
+            '--kubeconfig',
+            str(kubeconfig_path)
+        ])
         try:
             p = subprocess.run(
                 [
@@ -289,7 +283,7 @@ class TestSecrets:
                     '--kubeconfig',
                     str(kubeconfig_path),
                     '--context',
-                    'kind-kind',
+                    kind_context,
                     'apply',
                     '--filename',
                     str(k8sfile)
@@ -298,7 +292,7 @@ class TestSecrets:
                 stderr=subprocess.STDOUT,
                 check=True
             )
-            print('apply:', p.stdout)
+            assert b'secret/mysecrets created' in p.stdout
 
             p = subprocess.run(
                 [
@@ -306,7 +300,7 @@ class TestSecrets:
                     '--kubeconfig',
                     str(kubeconfig_path),
                     '--context',
-                    'kind-kind',
+                    kind_context,
                     'get',
                     'secret',
                     k8s_secret_name,

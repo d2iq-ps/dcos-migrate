@@ -122,7 +122,12 @@ def kind_path(
 ) -> Path:
     tmp_path = tmp_path_factory.mktemp('kind')
     kind_path = tmp_path / 'kind'
-    subprocess.run(['curl', '-Lo', str(kind_path), 'https://kind.sigs.k8s.io/dl/v0.9.0/kind-linux-amd64'])
+    subprocess.run([
+        'curl',
+        '-Lo',
+        str(kind_path),
+        'https://kind.sigs.k8s.io/dl/v0.9.0/kind-linux-amd64'
+    ])
     kind_path.chmod(0o755)
     return kind_path
 
@@ -141,17 +146,3 @@ def kubectl_path(
     ])
     kubectl_path.chmod(0o755)
     return kubectl_path
-
-
-@pytest.fixture
-def kind_cluster(
-    kind_path: Path,
-    tmp_path: Path,
-) -> Path:
-    kubeconfig_path = tmp_path / 'kubeconfig'
-    subprocess.run([str(kind_path), 'create', 'cluster', '--kubeconfig', str(kubeconfig_path)])
-    try:
-        yield kubeconfig_path
-    finally:
-        subprocess.run([str(kind_path), 'delete', 'cluster', '--kubeconfig', str(kubeconfig_path)])
-
