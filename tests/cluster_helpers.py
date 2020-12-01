@@ -1,21 +1,14 @@
-
 import logging
 from datetime import datetime
 from pathlib import Path
 from subprocess import CalledProcessError, PIPE, Popen
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
-import cryptography.hazmat.backends
 from _pytest.fixtures import SubRequest
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import NameOID
 from dcos_e2e.cluster import Cluster
 from dcos_e2e.exceptions import DCOSTimeoutError
 from dcos_e2e.node import Node
 from dcos_test_utils.enterprise import EnterpriseApiSession, EnterpriseUser
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -239,76 +232,3 @@ def _log_filename(name: str) -> Path:
     Returns a name of the file with `.log` extension.
     """
     return Path(name).with_suffix('.log')
-
-
-cryptography_default_backend = cryptography.hazmat.backends.default_backend()
-
-
-def _extract_private_key(keypair: rsa.RSAPrivateKeyWithSerialization) -> str:
-    """
-    Return the private key as a PEM-encoded string.
-    """
-    privkey_pem = keypair.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )  # type: bytes
-    return privkey_pem.decode('ascii')
-
-
-def generate_rsa_keypair() -> Tuple[str, str]:
-    """
-    Generate an RSA keypair with a key size of 2048 bits and an
-    exponent of 65537. Serialize the public key in the the
-    X.509 SubjectPublicKeyInfo/OpenSSL PEM public key format
-    (RFC 5280). Serialize the private key in the PKCS#8 (RFC 3447)
-    format.
-
-    Returns:
-        (private key, public key) 2-tuple, both unicode
-        objects holding the serialized keys.
-    """
-
-    keypair = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=cryptography_default_backend,
-    )
-    private = _extract_private_key(keypair)
-
-    public_key = keypair.public_key()
-    pubkey_pem = public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    public = pubkey_pem.decode('ascii')
-
-    return private, public
-
-
-def generate_csr(cn: str) -> Tuple[str, str]:
-    """
-    Generate a private key and a Certificate Signing Request.
-    """
-    keypair = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=cryptography_default_backend,
-    )
-    private = _extract_private_key(keypair)
-
-    subject_name = x509.Name([
-        x509.NameAttribute(NameOID.COUNTRY_NAME, 'US'),
-        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, 'CA'),
-        x509.NameAttribute(NameOID.LOCALITY_NAME, 'San Francisco'),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Mesosphere, Inc.'),
-        x509.NameAttribute(NameOID.COMMON_NAME, cn)
-    ])
-
-    csr = x509.CertificateSigningRequestBuilder().subject_name(
-        subject_name
-    ).sign(keypair, hashes.SHA256(), cryptography_default_backend)
-
-    csr_pem = csr.public_bytes(serialization.Encoding.PEM).decode('ascii')
-
-    return private, csr_pem

@@ -1,11 +1,12 @@
 import logging
 import os
+import subprocess
 from pathlib import Path
-from typing import Any
 from typing import Generator
 
 import pytest
 from _pytest.fixtures import SubRequest
+from _pytest.tmpdir import TempPathFactory
 from cluster_helpers import wait_for_dcos_ee
 from dcos_e2e.backends import Docker
 from dcos_e2e.cluster import Cluster
@@ -113,3 +114,35 @@ def master_node(
         master = next(iter(cluster.masters))
 
         yield master
+
+
+@pytest.fixture(scope='session')
+def kind_path(
+    tmp_path_factory: TempPathFactory
+) -> Path:
+    tmp_path = tmp_path_factory.mktemp('kind')
+    kind_path = tmp_path / 'kind'
+    subprocess.run([
+        'curl',
+        '-Lo',
+        str(kind_path),
+        'https://kind.sigs.k8s.io/dl/v0.9.0/kind-linux-amd64'
+    ])
+    kind_path.chmod(0o755)
+    return kind_path
+
+
+@pytest.fixture(scope='session')
+def kubectl_path(
+    tmp_path_factory: TempPathFactory
+) -> Path:
+    tmp_path = tmp_path_factory.mktemp('kubectl')
+    kubectl_path = tmp_path / 'kubectl'
+    subprocess.run([
+        'curl',
+        '-Lo',
+        str(kubectl_path),
+        'https://storage.googleapis.com/kubernetes-release/release/v1.19.0/bin/linux/amd64/kubectl'
+    ])
+    kubectl_path.chmod(0o755)
+    return kubectl_path
