@@ -25,9 +25,9 @@ separator = "--------------------------------------------------"
 # Return the downloaded package version
 def download(args) -> str:
     log.info('Downloading DC/OS package with marathon app id {} into target directory {}'.format(args.app_id, args.target_dir))
-    pkg_ver, task_id = backup.download_dcos_package(args.app_id, args.target_dir, [versions[0][0]])
-    backup.download_task_data(task_id, args.target_dir)
-
+    pkg_ver, task_id = backup.download_dcos_package(args.app_id, args.target_dir, [versions[0][0], versions[1][0]], args.use_existing_dir)
+    if not args.use_existing_dir:
+        backup.download_task_data(task_id, args.target_dir)
     if args.retain_builds and args.retain_next_build_number:
         return pkg_ver
 
@@ -127,7 +127,8 @@ Jenkins.instance.pluginManager.plugins.each{
         plugins.insert(0, "  additionalPlugins:\n")  # MUST be prefixed by two spaces as indent
         additionalPlugins = "  ".join(plugins)
     else:
-        log.warning('Skipping installation of additional plugins. More plugins can be installed by setting "master.additionalPlugins" list in values.yaml')
+        log.warning(
+            'Skipping installation of additional plugins. More plugins can be installed by setting "master.additionalPlugins" list in values.yaml')
     print(separator)
     print('Use following values.yaml to install helm chart\ncat <<EOF >> values.yaml{}EOF'.format(
         GENERIC_VALUES.format(tag=ver.JENKINS_VERSION, kubernetes_plugin=ver.KUBERNETES_PLUGIN_VERSION) + additionalPlugins))
@@ -197,7 +198,15 @@ def jobs_update(args):
         if not os.path.exists(job_config_xml):
             continue
         modified = False
+        disable_job = False
         if args.disable_jobs:
+            disable_job = True
+        elif args.disable_cron_jobs:
+            rc, _, _ = backup.run_cmd("grep -q {} {}".format("<hudson.triggers.TimerTrigger>", job_config_xml), print_output=False,
+                                         check=False)
+            disable_job = rc == 0
+
+        if disable_job:
             backup.run_cmd(
                 "sed -i '' -e 's/{}/{}/g' {}".format("<disabled>false<\/disabled>", "<disabled>true<\/disabled>", job_config_xml),
                 print_output=False,
@@ -270,6 +279,7 @@ def main():
     # Step 1 : Backup the DC/OS Jenkins task data
     backup_cmd = subparsers.add_parser("backup", help='Backup the DC/OS package data', parents=[parent_parser])
     backup_cmd.add_argument("--app-id", type=str, default="jenkins", help="Marathon application ID")
+    backup_cmd.add_argument("--use-existing-dir", action='store_true', help="Set the flag to skip downloading task data")
     backup_cmd.add_argument("--retain-builds", action='store_true', help="Set to retain previous builds data")
     backup_cmd.add_argument("--retain-next-build-number", action='store_true', help='Set to retain nextBuildNumber counter')
     backup_cmd.set_defaults(func=download)
@@ -297,6 +307,8 @@ def main():
     migrate_jobs_update_cmd.add_argument("--path", type=str, default="*", help=job_path_help)
     migrate_jobs_update_cmd.add_argument("--disable-jobs", action='store_true',
                                          help='If set, the job config.xml is updated to disable the job by setting "<disabled>true</disabled>"')
+    migrate_jobs_update_cmd.add_argument("--disable-cron-jobs", action='store_true',
+                                         help='If set, the job config.xml is updated to disable the job by setting "<disabled>true</disabled>" iff the job has a TimerTrigger (cron schedule)')
     migrate_jobs_update_cmd.set_defaults(func=jobs_update)
 
     # Step 3b: Copy jobs to kubernetes jenkins instance
