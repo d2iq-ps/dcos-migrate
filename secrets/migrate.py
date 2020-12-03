@@ -77,7 +77,7 @@ def run(argv: List[str]) -> None:
 
 
 def main() -> None:
-    run(sys.argv)
+    run(sys.argv[1:])
 
 
 if __name__ == '__main__':

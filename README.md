@@ -1,6 +1,9 @@
 # dcos-migration
 Tools for migrating workloads and other resources from DCOS to DKP
 
+## Running
+
+See the `README.md` file in each subdirectory for how to use each tool.
 
 ## Testing
 
