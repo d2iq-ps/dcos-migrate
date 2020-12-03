@@ -146,8 +146,10 @@ class TestSecrets:
             url = backup.get_dcos_url(cli.path)
             token = backup.get_dcos_token(cli.path)
             trust = backup.get_dcos_truststore(url)
+            truststore = tmp_path / 'trust'
+            truststore.write_text(trust)
 
-            s = backup.DCOSSecretsService(url, token, trust)
+            s = backup.DCOSSecretsService(url, token, truststore)
 
             # `list` returns all keys below the folder
             response = s.list('')
