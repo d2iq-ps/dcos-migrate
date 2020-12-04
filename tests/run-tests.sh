@@ -19,4 +19,4 @@ export DCOS_E2E_TMP_DIR_PATH=/tmp
 export DCOS_LICENSE=$(cat ${PWD}/license.txt)
 export DCOS_E2E_LOG_DIR=/tmp/logs
 
-PYTHONPATH=${PWD}/.. pytest -vv "$@"
+PYTHONPATH=${PWD}/.. pytest "$@"

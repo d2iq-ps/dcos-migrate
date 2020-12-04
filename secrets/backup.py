@@ -5,7 +5,10 @@ import os
 import requests
 import subprocess
 import sys
+import tempfile
 import urllib
+import urllib3
+import warnings
 from typing import Dict, List
 
 DCOS = os.getenv("DCOS_CLI", "dcos")
@@ -25,7 +28,7 @@ class DCOSSecretsService:
                 store=urllib.parse.quote(self.store), path=urllib.parse.quote(path)
             ),
             headers={'Authorization': self.auth},
-            verify=False,
+            verify=self.trust,
         )
         r.raise_for_status()
         return r.json()['array']
@@ -49,7 +52,7 @@ class DCOSSecretsService:
         r = requests.get(
             url,
             headers={'Authorization': self.auth, 'Accept': '*/*'},
-            verify=False,
+            verify=self.trust,
         )
         r.raise_for_status()
         content_type = r.headers['Content-Type']
@@ -72,7 +75,11 @@ class DCOSSecretsService:
 
 
 def get_dcos_truststore(dcos_url: str) -> str:
-    r = requests.get(dcos_url + '/ca/dcos-ca.crt', verify=False)
+    # Download the CA certificate for the cluster to verify subsequent connections. Since we don't
+    # yet have the CA certificate, this request cannot be verified (and hence is insecure).
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
+        r = requests.get(dcos_url + '/ca/dcos-ca.crt', verify=False)
     r.raise_for_status()
     cert = r.text
     return cert
@@ -112,21 +119,24 @@ def run(argv: List[str]) -> None:
     token = get_dcos_token(DCOS)
     trust = get_dcos_truststore(url)
 
-    s = DCOSSecretsService(url, token, trust)
-    secrets = []
-    for key in s.list(path):
-        secrets.append(s.get(path, key))
+    with tempfile.NamedTemporaryFile('w+', encoding='utf-8') as certf:
+        certf.write(trust)
+        certf.flush()
+        s = DCOSSecretsService(url, token, certf.name)
+        secrets = []
+        for key in s.list(path):
+            secrets.append(s.get(path, key))
 
-    if args.target_file is None:
-        f = sys.stdout
-    else:
-        # To protect secrets open with read/write permissions only for owner
-        f = os.fdopen(os.open(args.target_file, os.O_WRONLY | os.O_CREAT, 0o600), 'w')
-    try:
-        json.dump(secrets, f, indent=2, sort_keys=True)
-    finally:
-        if args.target_file is not None:
-            f.close()
+        if args.target_file is None:
+            f = sys.stdout
+        else:
+            # To protect secrets open with read/write permissions only for owner
+            f = os.fdopen(os.open(args.target_file, os.O_WRONLY | os.O_CREAT, 0o600), 'w')
+        try:
+            json.dump(secrets, f, indent=2, sort_keys=True)
+        finally:
+            if args.target_file is not None:
+                f.close()
 
 
 def main() -> None:
