@@ -38,9 +38,30 @@ def _sanitize_and_merge_envs(app_env: dict, task_env: dict) -> dict:
     return envs
 
 
-def download_dcos_package(app_id: str, target_dir: str, versions: [str]) -> [str, str]:
+def _generate_backup_cmd(app_id: str, backup_params: dict) -> str:
+    cmd = "cassandra --name={} plan start backup-s3".format(app_id)
+    for param_key in backup_params:
+        cmd += ' -p "{}={}"'.format(param_key, backup_params[param_key])
+    return cmd
+
+
+def print_backup_instructions(app_id: str, backup_cmd: str):
+    separator = "--------------------------------------------------"
+    print("\n{}".format(separator))
+    print("Run following command to trigger the Schema and Data backup:")
+    print("\n{} {}".format(DCOS, backup_cmd))
+    print(separator)
+    print("\nRun following command to check the backup status:")
+    print("\n{} cassandra --name={} plan status backup-s3".format(DCOS, app_id))
+    print("\nNote: Make sure backup plan is completed to go forward.")
+    print(separator)
+
+
+def download_dcos_package(app_id: str, target_dir: str, version: str):
     log.info("Validating DC/OS CLI is setup correctly")
     run_cmd("{} --version".format(DCOS), check=True)
+    log.info("Validating DC/OS Cassandra Service and CLI are setup correctly")
+    run_cmd("{} cassandra plan status deploy".format(DCOS), check=True)
     target_dir = os.path.abspath(target_dir)
 
     _, out, err = run_cmd("{} marathon app show {}".format(DCOS, app_id))
@@ -59,9 +80,9 @@ def download_dcos_package(app_id: str, target_dir: str, versions: [str]) -> [str
         log.error('Cannot migrate "{}" package. Supported package is "cassandra"'.format(DCOS_PACKAGE_NAME))
         return
     DCOS_PACKAGE_VERSION = app["labels"]["DCOS_PACKAGE_VERSION"]
-    if DCOS_PACKAGE_VERSION not in versions:
-        log.error('Cannot migrate "{}" package : version "{}" not yet supported. Supported versions are {}'.format(
-            DCOS_PACKAGE_NAME, DCOS_PACKAGE_VERSION, versions))
+    if DCOS_PACKAGE_VERSION != version:
+        log.error('Cannot migrate "{}" package : version "{}". Provided version "{}" is not found.'.format(
+            DCOS_PACKAGE_NAME, DCOS_PACKAGE_VERSION, version))
         return
 
     if len(app["tasks"]) == 0:
@@ -73,14 +94,9 @@ def download_dcos_package(app_id: str, target_dir: str, versions: [str]) -> [str
 
     with open(os.path.join(target_dir, CASSANDRA_ENV_JSON), "w+") as f:
         json.dump(app_envs, f)
-    
-    return DCOS_PACKAGE_VERSION
 
 
-# def download_task_data(cassandra_ver: str, app_id: str, target_dir: str) -> str:
-#    task_name = app_id.lstrip('/').replace('/', '.') + "__node-0-server__"
-#    for conf_file in CONFIG_FILES:
-#        log.info("Downloading config file: {}".format(conf_file))
-#        _, out, err = run_cmd("{} task exec {} bash -c 'cat apache-cassandra-{}/conf/{}'".format(DCOS, task_name, cassandra_ver, conf_file))
-#        with open(os.path.join(target_dir, conf_file), "w+") as f:
-#            f.write(out)
+def download_task_data_on_s3(app_id: str, backup_params: dict):
+    log.info("Generating command for Schema and Data Backup plan")
+    backup_cmd = _generate_backup_cmd(app_id, backup_params)
+    print_backup_instructions(app_id, backup_cmd)
