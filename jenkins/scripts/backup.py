@@ -56,7 +56,7 @@ def run_cmd(cmd: str, print_output: bool = False, check: bool = True, timeout_se
         return e.returncode, stdout, stderr
 
 
-def download_dcos_package(app_id: str, target_dir: str, versions: [str]) -> [str, str]:
+def download_dcos_package(app_id: str, target_dir: str, versions: [str], use_existing_dir: bool) -> [str, str]:
     log.info("Validating DC/OS CLI is setup correctly")
     run_cmd("{} --version".format(DCOS), check=True)
     target_dir = os.path.abspath(target_dir)
@@ -68,7 +68,7 @@ def download_dcos_package(app_id: str, target_dir: str, versions: [str]) -> [str
 
     app = json.loads(out, encoding=encoding)
     os.makedirs(target_dir, exist_ok=True)
-    if len(os.listdir(target_dir)) != 0:
+    if not use_existing_dir and len(os.listdir(target_dir)) != 0:
         log.fatal('Provided directory "{}" is not empty. Use an empty directory to prevent data corruption.'.format(target_dir))
     with open(os.path.join(target_dir, MARATHON_JSON), "w+") as f:
         f.write(out)
@@ -91,7 +91,7 @@ def download_dcos_package(app_id: str, target_dir: str, versions: [str]) -> [str
 
 def download_task_data(task_id: str, target_dir: str) -> str:
     log.info("Downloading config.xml")
-    run_cmd("{} -v task download {} jenkins_home/config.xml --target-dir={}".format(DCOS, task_id, target_dir), check=True)
+    run_cmd("{} -v task download {} jenkins_home/config.xml --target-dir={}".format(DCOS, task_id, target_dir), check=True, print_cmd=True)
     log.info('Downloading jobs folder')
-    run_cmd("{} task download {} jenkins_home/jobs --target-dir={}".format(DCOS, task_id, target_dir), check=False)
+    run_cmd("{} task download {} jenkins_home/jobs --target-dir={}".format(DCOS, task_id, target_dir), check=False, print_cmd=True)
     return "{}/config.xml".format(target_dir)
