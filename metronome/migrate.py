@@ -30,6 +30,18 @@ def dnsify(name):
     return new_name
 
 
+# FIXME: reuse version from secrets migration. BEWARE: added lstrip(".")!
+_invalid_secret_key = re.compile("[^-._a-zA-Z0-9]")
+
+
+def clean_key(s: str) -> str:
+    # Replace DC/OS folders with dots
+    s = s.replace("/", ".")
+    # Replace other invalid characters with `_`
+    # `folder/sec!ret` becomes `folder.sec_ret`
+    return _invalid_secret_key.sub("_", s).lstrip(".")
+
+
 EXTRACT_COMMAND = dict(
     [(".zip", "gunzip")]
     + [
@@ -100,7 +112,7 @@ def translate_schedule_prop(key, val, result):
 ###############################################################################
 #                                     JOB                                     #
 ###############################################################################
-def translate_job_prop(key, val, result, args):
+def translate_job_prop(key, val, result, json_spec, args):
     def update(props):
         return deep_merge(result, props)
 
@@ -110,6 +122,28 @@ def translate_job_prop(key, val, result, args):
     # For now we have the assumption that all jobs only run a single container.
     def update_container(props):
         return update_pod_spec({"containers": [props]})
+
+    def secret(env_key, env_val):
+        if not args.imported_k8s_secret_name:
+            raise RuntimeError(
+                "The Job uses secrets. Please make sure you imported your secrets beforehand and provide the name you chose via --imported-k8s-secret-name."
+            )
+
+        ref = json_spec["secrets"].get(env_val["secret"])
+        if not ref:
+            raise RuntimeError(
+                f"Env var '{env_key}' makes use of a secret, but no according mapping was found at '.secrets.{ref}'."
+            )
+
+        return {
+            "name": env_key,
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": args.imported_k8s_secret_name,
+                    "key": clean_key(ref.get("source")),
+                }
+            },
+        }
 
     if re.match(".dependencies", key):
         warn("Not migrating dependencies")
@@ -132,8 +166,9 @@ def translate_job_prop(key, val, result, args):
         return update({"metadata": {"labels": val}})
 
     if re.match(".run.args", key):
-        args = result.get("run", {}).get("args", [])
-        return update_container({"args": args.append(val)})
+        return update_container(
+            {"args": result.get("run", {}).get("args", []).append(val)}
+        )
 
     if ".run.artifacts" == key:
         if not args.working_dir:
@@ -217,9 +252,15 @@ def translate_job_prop(key, val, result, args):
             return result
         return update_container({"resources": {"limits": {"ephemeral-storage": val}}})
 
-    if re.match(".run.env", key):
-        env = deep_get(result, "spec.template.spec.containers.0.env", [])
-        env.append({"name": key.replace(".run.env.", ""), "value": val})
+    if ".run.env" == key:
+        env = []
+        for env_key, env_val in val.items():
+            env.append(
+                secret(env_key, env_val)
+                if "secret" in env_val
+                else {"name": env_key, "value": env_val}
+            )
+
         return update_container({"env": env})
 
     if ".run.gpus" == key:
@@ -315,24 +356,18 @@ def convert_ucr_to_docker(model):
 
 
 def translate(args):
-    plain_json = load_json_file(args.path)
-    artifacts = plain_json["run"].pop("artifacts", None)
-    labels = plain_json.pop("labels", None)
-    secrets = plain_json["run"].pop("secrets", None)
+    json_spec = load_json_file(args.path)
+    artifacts = json_spec["run"].pop("artifacts", None)
+    labels = json_spec.pop("labels", None)
+    secrets = json_spec["run"].pop("secrets", None)
+    env = json_spec["run"].pop("env", None)
 
-    if secrets is not None:
-        warn(
-            """TODO: definition contains secrets. you'll need to go through the env vars and look for those ending in '.secret', migrate the according secret and add a section like the following for each:
-- name: MY_ENV_VAR
-  valueFrom:
-  secretKeyRef:
-      name: mysecret
-      key: SECRET_KEY
-"""
-        )
-
-    model = flatten(plain_json)
+    model = flatten(json_spec)
     convert_ucr_to_docker(model)
+
+    json_spec["secrets"] = secrets
+    if env:
+        model[".run.env"] = env
     if artifacts:
         model[".run.artifacts"] = artifacts
     if labels:
@@ -343,15 +378,15 @@ def translate(args):
 
     plain_job = {}
     for k, v in job_props:
-        plain_job = translate_job_prop(k, v, plain_job, args)
+        plain_job = translate_job_prop(k, v, plain_job, json_spec, args)
 
     # ensure an image is set
-    if plain_job["spec"]["template"]["spec"]["containers"][0].get("image") is None:
+    if not "image" in plain_job["spec"]["template"]["spec"]["containers"][0]:
         if not args.image:
             raise RuntimeError(
                 "Job does not specify an image; please specify an `--image` to use."
             )
-        plain_job = translate_job_prop(".run.docker.image", args.image, plain_job, args)
+        plain_job["spec"]["template"]["spec"]["containers"][0]["image"] = args.image
 
     if any(schedule_props) > 0:
         cron_job = {
@@ -383,12 +418,18 @@ def main():
     )
     translate_cmd.add_argument("path", help="path to a Metronome JobSpec")
     translate_cmd.add_argument(
-        "--working-dir", help="Needs to be set in case your Job used 'artifacts'"
-    )
-    translate_cmd.add_argument(
         "--image",
         help="A docker image to fall back to in case your Job definition does not contain one",
     )
+    translate_cmd.add_argument(
+        "--imported-k8s-secret-name",
+        type=str,
+        help="Name of the K8s secret into which the DCOS secrets have been imported",
+    )
+    translate_cmd.add_argument(
+        "--working-dir", help="Needs to be set in case your Job used 'artifacts'"
+    )
+
     translate_cmd.set_defaults(func=lambda args: translate(args))
 
     download_cmd = subparsers.add_parser(
