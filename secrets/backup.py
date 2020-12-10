@@ -68,7 +68,13 @@ class DCOSSecretsService:
             # Always encode the secret as base64, even when it is safe UTF-8 text.
             # This obscures the values to prevent unintentional exposure.
             response['value'] = base64.b64encode(response['value'].encode('utf-8')).decode('ascii')
-        # Always add the `path` and `key` values to the JSON response
+        # Always add the `path` and `key` values to the JSON response. Ensure the key always has a
+        # value by taking the last component of the path if necessary.
+        if not key:
+            parts = path.rsplit('/', 1)
+            key = parts.pop()
+            parts.append('')
+            path = parts[0]
         response['path'] = path
         response['key'] = key
         return response
@@ -124,8 +130,14 @@ def run(argv: List[str]) -> None:
         certf.flush()
         s = DCOSSecretsService(url, token, certf.name)
         secrets = []
-        for key in s.list(path):
-            secrets.append(s.get(path, key))
+        keys = s.list(path)
+        if keys:
+            # Path is a folder containing secrets
+            for key in s.list(path):
+                secrets.append(s.get(path, key))
+        else:
+            # Expect path to name a specific secret
+            secrets.append(s.get(path, ''))
 
         if args.target_file is None:
             f = sys.stdout

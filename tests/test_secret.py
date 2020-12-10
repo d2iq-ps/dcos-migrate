@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import requests
 
 from _pytest.fixtures import SubRequest
 from cluster_helpers import wait_for_dcos_ee
@@ -102,6 +103,8 @@ class TestSecrets:
 
             cli.setup_enterprise(master_url, superuser_username, superuser_password)
 
+            # Add secrets to DC/OS
+
             # key1: value1
             value1 = 'value1'
             cli.exec_command(
@@ -143,6 +146,8 @@ class TestSecrets:
                 'folder/sub/key4'
             ])
 
+            # Setup DCOSSecretsService client
+
             url = backup.get_dcos_url(cli.path)
             token = backup.get_dcos_token(cli.path)
             trust = backup.get_dcos_truststore(url)
@@ -161,12 +166,16 @@ class TestSecrets:
             response = s.list('folder/sub')
             assert response == ['key4']
 
+            response = s.list('folder/sub/key4')
+            assert response == []
+
             response = s.list('fold')
             assert response == []
 
             response = s.list('not/a/folder')
             assert response == []
 
+            # `get` returns value of a single secret
             response = s.get('', 'key1')
             assert response['path'] == ''
             assert response['key'] == 'key1'
@@ -230,6 +239,18 @@ class TestSecrets:
                 "uid": "dcos-service"
             }
 
+            # Trying to `get` a folder raises 404
+            with pytest.raises(requests.HTTPError) as exception:
+                response = s.get('folder/sub', '')
+            assert exception.value.response.status_code == 404
+
+            # Non-existent secret raises 404
+            with pytest.raises(requests.HTTPError) as exception:
+                s.get('not/a/path', '')
+            assert exception.value.response.status_code == 404
+
+            # Test backup of DC/OS secrets
+
             dcosfile1 = tmp_path / 'output-1'
             backup.run(['--target-file', str(dcosfile1)])
             assert stat.S_IMODE(dcosfile1.stat().st_mode) == 0o600
@@ -254,6 +275,19 @@ class TestSecrets:
             keys = set(s['key'] for s in response)
             assert keys == {'key4'}
 
+            dcosfile4 = tmp_path / 'output-4'
+            backup.run(['--path', 'folder/sub/key4', '--target-file', str(dcosfile4)])
+            assert stat.S_IMODE(dcosfile4.stat().st_mode) == 0o600
+            with dcosfile4.open() as f:
+                response = json.load(f)
+            assert len(response) == 1
+            s = response[0]
+            assert s['path'] == 'folder/sub'
+            assert s['key'] == 'key4'
+
+        # Test migration from DC/OS file to K8s file
+
+        # Multiple secrets
         k8s_secret_name = 'mysecrets'
         k8sfile = tmp_path / 'output-1k'
         migrate.run([
@@ -264,6 +298,20 @@ class TestSecrets:
             response = json.load(f)
         keys = response['data'].keys()
         assert keys == {'key1', 'folder.key2', 'folder.key3', 'folder.sub.key4'}
+
+        # Single secret
+        k8s_secret_name_4 = 'mysecrets4'
+        k8sfile_4 = tmp_path / 'output-4k'
+        migrate.run([
+            '--input', str(dcosfile4), '--output', str(k8sfile_4), '--name', k8s_secret_name_4
+        ])
+        assert stat.S_IMODE(k8sfile_4.stat().st_mode) == 0o600
+        with k8sfile_4.open() as f:
+            response = json.load(f)
+        keys = response['data'].keys()
+        assert keys == {'key4'}
+
+        # Test that migrated file is valid input to K8s
 
         kind_name = ''.join(random.choice(string.ascii_lowercase) for x in range(4))
         kind_context = 'kind-{}'.format(kind_name)
