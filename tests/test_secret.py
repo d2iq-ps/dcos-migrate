@@ -146,6 +146,13 @@ class TestSecrets:
                 'folder/sub/key4'
             ])
 
+            # The DC/OS Secrets Service permits a secret to exist at the same path as a folder.
+            # key5: value5
+            value5 = 'value5'
+            cli.exec_command(
+                ['dcos', 'security', 'secrets', 'create', '--value', value5, 'folder/sub']
+            )
+
             # Setup DCOSSecretsService client
 
             url = backup.get_dcos_url(cli.path)
@@ -158,11 +165,15 @@ class TestSecrets:
 
             # `list` returns all keys below the folder
             response = s.list('')
-            assert response == ['folder/key2', 'folder/key3', 'folder/sub/key4', 'key1']
+            assert response == [
+                'folder/key2', 'folder/key3', 'folder/sub', 'folder/sub/key4', 'key1'
+            ]
 
             response = s.list('folder')
-            assert response == ['key2', 'key3', 'sub/key4']
+            assert response == ['key2', 'key3', 'sub', 'sub/key4']
 
+            # When there is a secret and a folder at the same path, `list` returns the secrets
+            # under the folder.
             response = s.list('folder/sub')
             assert response == ['key4']
 
@@ -205,6 +216,12 @@ class TestSecrets:
                 "uid": "dcos-service"
             }
 
+            response = s.get('', 'folder/sub')
+            assert response['path'] == ''
+            assert response['key'] == 'folder/sub'
+            assert response['type'] == 'text'
+            assert base64.b64decode(response['value']).decode('utf-8') == value5
+
             response = s.get('folder', 'key2')
             assert response['path'] == 'folder'
             assert response['key'] == 'key2'
@@ -241,7 +258,7 @@ class TestSecrets:
 
             # Trying to `get` a folder raises 404
             with pytest.raises(requests.HTTPError) as exception:
-                response = s.get('folder/sub', '')
+                response = s.get('folder', '')
             assert exception.value.response.status_code == 404
 
             # Non-existent secret raises 404
@@ -257,7 +274,7 @@ class TestSecrets:
             with dcosfile1.open() as f:
                 response = json.load(f)
             keys = set(s['key'] for s in response)
-            assert keys == {'key1', 'folder/key2', 'folder/key3', 'folder/sub/key4'}
+            assert keys == {'key1', 'folder/key2', 'folder/key3', 'folder/sub', 'folder/sub/key4'}
 
             dcosfile2 = tmp_path / 'output-2'
             backup.run(['--path', 'folder', '--target-file', str(dcosfile2)])
@@ -265,8 +282,10 @@ class TestSecrets:
             with dcosfile2.open() as f:
                 response = json.load(f)
             keys = set(s['key'] for s in response)
-            assert keys == {'key2', 'key3', 'sub/key4'}
+            assert keys == {'key2', 'key3', 'sub', 'sub/key4'}
 
+            # When backing up a path that is a secret and a folder, only the secrets under the
+            # folder are exported, not the secret at the named path.
             dcosfile3 = tmp_path / 'output-3'
             backup.run(['--path', 'folder/sub', '--target-file', str(dcosfile3)])
             assert stat.S_IMODE(dcosfile3.stat().st_mode) == 0o600
@@ -297,7 +316,7 @@ class TestSecrets:
         with k8sfile.open() as f:
             response = json.load(f)
         keys = response['data'].keys()
-        assert keys == {'key1', 'folder.key2', 'folder.key3', 'folder.sub.key4'}
+        assert keys == {'key1', 'folder.key2', 'folder.key3', 'folder.sub', 'folder.sub.key4'}
 
         # Single secret
         k8s_secret_name_4 = 'mysecrets4'
