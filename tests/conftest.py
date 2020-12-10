@@ -18,6 +18,17 @@ from passlib.hash import sha512_crypt
 logging.basicConfig(level=logging.DEBUG)
 
 
+@pytest.fixture(scope='session', autouse=True)
+def configure_logging() -> None:
+    """
+    Suppress INFO, DEBUG and NOTSET log messages from libraries that log
+    excessive amount of debug output that isn't useful for debugging e2e tests.
+    """
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.WARN)
+    logging.getLogger('docker').setLevel(logging.WARN)
+    logging.getLogger('sarge').setLevel(logging.WARN)
+
+
 @pytest.fixture(scope='session')
 def workspace_dir() -> Path:
     """
