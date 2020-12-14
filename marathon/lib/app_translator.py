@@ -452,6 +452,13 @@ def deep_merge(first, second, debug_prefix=''):
     >>> result == {3: [{"foo": "bar", "bar": "baz"}, "deadbeef"]}
     True
 
+    >>> deep_merge({"foo": 1}, {"foo": 1}) == {"foo": 1}
+    True
+
+    >>> deep_merge({"foo": 1}, {"foo": 2}) # doctest: +IGNORE_EXCEPTION_DETAIL
+    Traceback (most recent call last):
+        ...
+    UpdateConflict: Conflicting values for .foo: 1 and 2
     """
     if all(isinstance(_, dict) for _ in (first, second)):
         def iter_items():
