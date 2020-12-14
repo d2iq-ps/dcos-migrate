@@ -301,7 +301,6 @@ def translate_fetch(fetches, artifacts_volume_name):
     def iter_command():
         yield 'set -x'
         yield 'set -e'
-        yield 'cd /fetch_artifacts'
         yield 'FETCH_PID_ARRAY=()'
 
         for fetch in fetches:
@@ -334,6 +333,7 @@ def translate_fetch(fetches, artifacts_volume_name):
                     "name": artifacts_volume_name,
                     "mountPath": "/fetch_artifacts"
                 }],
+                "workingDir": "/fetch_artifacts",
             }],
             "volumes": [{"name": artifacts_volume_name, "emptyDir": {}}]
         }),
