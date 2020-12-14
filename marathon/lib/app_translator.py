@@ -122,6 +122,10 @@ class MissingSecretSource(Exception):
     pass
 
 class AdditionalFlagNeeded(Exception):
+    """
+    Used to indicate that for migrating this specific app the user is obliged
+    to specify a flag which could otherwise have been omitted.
+    """
     pass
 
 
@@ -363,7 +367,7 @@ def get_container_translator(defaults: ContainerDefaults, error_location):
             if defaults.image:
                 container['image'] = defaults.image
             else:
-                raise RuntimeError(
+                raise AdditionalFlagNeeded(
                     '{} has no image; please specify non-empty `--default-image` and run again'.format(error_location)
                 )
 
@@ -373,7 +377,7 @@ def get_container_translator(defaults: ContainerDefaults, error_location):
         fetch = Translated()
         if fields.get('fetch'):
             if not defaults.working_dir:
-                raise RuntimeError(
+                raise AdditionalFlagNeeded(
                     '{} is using "fetch"; please specify non-empty `--container-working-dir` and run again'.format(error_location)
                 )
 
