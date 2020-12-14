@@ -4,13 +4,16 @@ import argparse
 import json
 import os
 import re
+import requests
 import subprocess
 import sys
 
+
 # This script relies on python-yaml installed via pip, system package manager or some other means.
 import yaml
+from utils import deep_merge, flatten
 
-from utils import deep_get, deep_merge, flatten, load_json_file
+TARGET_DIR = "./metronome-jobs"
 
 
 def info(msg):
@@ -40,6 +43,13 @@ def clean_key(s: str) -> str:
     # Replace other invalid characters with `_`
     # `folder/sec!ret` becomes `folder.sec_ret`
     return _invalid_secret_key.sub("_", s).lstrip(".")
+
+
+def dcos(cmd: str):
+    status, out = subprocess.getstatusoutput(f"{os.getenv('DCOS_CLI', 'dcos')} {cmd}")
+    if status != 0:
+        raise RuntimeError(f"cmd '{cmd}' failed with status {status}: {out}")
+    return out
 
 
 EXTRACT_COMMAND = dict(
@@ -179,7 +189,6 @@ def translate_job_prop(key, val, result, json_spec, args):
         def iter_command():
             yield "set -x"
             yield "set -e"
-            yield "cd /fetch_artifacts"
             yield "FETCH_PID_ARRAY=()"
 
             for fetch in val:
@@ -210,15 +219,18 @@ def translate_job_prop(key, val, result, json_spec, args):
                         ]
                     }
                 ],
-                "initContainers": {
-                    "name": "fetch",
-                    "image": "bash:5.0",
-                    "command": ["bash", "-c", "\n".join(iter_command())],
-                    "volumeMounts": [
-                        {"name": "fetch-artifacts", "mountPath": "/fetch-artifacts"}
-                    ],
-                },
-                "volumes": [{"name": "fetch-artifacts", "emptyDir": "{}"}],
+                "initContainers": [
+                    {
+                        "name": "fetch",
+                        "image": "bash:5.0",
+                        "command": ["bash", "-c", "\n".join(iter_command())],
+                        "volumeMounts": [
+                            {"name": "fetch-artifacts", "mountPath": "/fetch-artifacts"}
+                        ],
+                        "workingDir": "/fetch_artifacts",
+                    }
+                ],
+                "volumes": [{"name": "fetch-artifacts", "emptyDir": {}}],
             }
         )
 
@@ -289,7 +301,7 @@ def translate_job_prop(key, val, result, json_spec, args):
         warn("TODO: conversion of .run.networks is not yet implemented.")
         return result
 
-    if ".run.placement.constraints" == key:
+    if re.match(".run.placement.constraints", key):
         warn("TODO: conversion of .run.placement.constraints is not yet implemented.")
         return result
 
@@ -308,7 +320,7 @@ def translate_job_prop(key, val, result, json_spec, args):
         return result
 
     if re.match(".run.secrets", key):
-        warn("TODO: conversion of .run.secrets is not yet implemented.")
+        # nothing to do here. we pass those via json_spec and handle them in .run.env.
         return result
 
     if ".run.taskKillGracePeriodSeconds" == key:
@@ -356,7 +368,8 @@ def convert_ucr_to_docker(model):
 
 
 def translate(args):
-    json_spec = load_json_file(args.path)
+    with open(args.path) as f:
+        json_spec = json.load(f)
     artifacts = json_spec["run"].pop("artifacts", None)
     labels = json_spec.pop("labels", None)
     secrets = json_spec["run"].pop("secrets", None)
@@ -406,7 +419,18 @@ def translate(args):
 
 
 def download():
-    subprocess.call("./downloadAll.sh", shell=True)
+    cluster_url = dcos("config show core.dcos_url")
+
+    print(
+        f"About to download all job specs from {cluster_url} to ./metronome-jobs/. Will this will potentially overwrite existing json files."
+    )
+    if not os.path.exists(TARGET_DIR):
+        os.makedirs(TARGET_DIR)
+    for job in json.loads(dcos("job list --json")):
+        with open(f"{TARGET_DIR}/{job['id']}.json", "w") as f:
+            if "historySummary" in job:
+                del job["historySummary"]
+            json.dump(job, f, indent=2)
 
 
 def main():

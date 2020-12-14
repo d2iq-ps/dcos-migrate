@@ -23,16 +23,7 @@ A typical workflow might look like this:
 
 ### Download all job specs
 
-`./migrate.py download` will download all job specs present on that cluster to `./metronome-jobs`:
-
-```
-➜ ./migrate.py download
-About to download all job specs from <CLUSTER_ID>
-Proceed? [Y/n]
-
-downloading job1 to ./metronome-jobs/job1.json
-downloading job2 to ./metronome-jobs/job2.json
-```
+`./migrate.py download` will download all job specs present on that cluster to `./metronome-jobs/<JOB_ID>.json`.
 
 ### Translate jobs:
 
@@ -52,10 +43,17 @@ might show warnings on `stderr` along the way:
 mkdir -p dkp-jobs
 for f in ./metronome-jobs/*.json
 do
- echo "Processing $f"
+ echo "=== Processing $f ==="
  ./migrate.py translate $f > "dkp-jobs/$(basename "$f" .json).yaml"
 done
 ```
+
+your main call might provide a default image to fall back to as well as a secret reference and a working-dir in case your job makes use of artifacts:
+
+```
+ ./migrate.py translate --image busybox --imported-k8s-secret-name my-secret --working-dir /app $f > "dkp-jobs/$(basename "$f" .json).yaml"
+```
+
 
 ### Evaluate the results
 
@@ -85,6 +83,7 @@ Metronome adds default values to every Job specification. In order to reduce the
 
 * `artifacts` - are now pulled in via `initContainers` before starting the Job's Pod.
 * `run.ucr` - we convert this in case `kind` is set to `docker`. Else they're ignored and you might need to set `resources.image`, `resources.imagePullPolicy`, and/or `securityContext.privileged` manually in the resulting yaml. You'll get an warning whenever `UCR` configuration is present.
+* `run.secrets` - you'll need to create a k8s-secret separately. there's a script for that in this repo. you'll need to specify a `--imported-k8s-secret-name` if the job you convert makes use of secrets. in case you want to reference multiple k8s-secrets, you currently need to manually correct the data in the resulting yaml. we plan on supporting that in the future though.
 
 ### Deploy the resulting yamls onto a Kubernetes cluster.
 

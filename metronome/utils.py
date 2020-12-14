@@ -6,25 +6,6 @@ import json
 from copy import copy
 
 
-def deep_get(d, path, default=None):
-    """
-    >>> deep_get({'a': [{'b': 2}]}, "a.0.b")
-    2
-
-    >>> deep_get({'a': [{'b': 2}]}, "a.1.b", "hi")
-    'hi'
-    """
-
-    def get(mapping, key):
-        if isinstance(mapping, dict) and key in mapping:
-            return mapping.get(key)
-        if isinstance(mapping, list) and len(mapping) > int(key):
-            return mapping[int(key)]
-        return default
-
-    return reduce(get, path.split("."), d)
-
-
 def deep_merge(dest, src):
     """
     >>> a = { 'b': [{'d': 1}, 2] }
@@ -73,8 +54,3 @@ def flatten(value, prefix=""):
         return merge_via(enumerate(value), prefix)
 
     return {prefix: value}
-
-
-def load_json_file(path: str):
-    with open(path) as f:
-        return json.load(f)
