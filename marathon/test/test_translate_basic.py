@@ -2,6 +2,8 @@ from ..lib import app_translator
 import os
 import sys
 
+import pytest
+
 def test_sleep():
     container_defaults = app_translator.Settings(
         app_translator.ContainerDefaults(
@@ -24,3 +26,31 @@ def test_sleep():
     assert(container['image'] == 'busybox')
     assert(container['resources'] == {'requests': {'cpu': 0.01, 'memory': '64Mi'}})
     assert(container['name'] == 'main')
+
+
+def test_image_in_app_makes_image_default_unnecessary():
+    settings = app_translator.Settings(
+        app_translator.ContainerDefaults(
+            image=None,
+            working_dir=None,
+        ),
+        imported_k8s_secret_name = "dummy"
+    )
+
+    app = {"id":"app", "container": {"docker": {"image": "busybox"}}}
+    result, _ = app_translator.translate_app(app, settings)
+    assert result['spec']['template']['spec']['containers'][0]['image'] == "busybox"
+
+
+def test_image_should_be_present_somewhere():
+    settings = app_translator.Settings(
+        app_translator.ContainerDefaults(
+            image=None,
+            working_dir=None,
+        ),
+        imported_k8s_secret_name = "dummy"
+    )
+
+    app = {"id":"app", "command": "sleep 300"}
+    with pytest.raises(app_translator.AdditionalFlagNeeded, match=".*image.*"):
+        app_translator.translate_app(app, settings)
