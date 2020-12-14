@@ -1,5 +1,7 @@
 import json
 import logging
+import os.path
+
 from collections import namedtuple
 
 Settings = namedtuple('Settings', ['container_defaults', 'imported_k8s_secret_name'])
@@ -7,8 +9,6 @@ Settings = namedtuple('Settings', ['container_defaults', 'imported_k8s_secret_na
 ContainerDefaults = namedtuple('ContainerDefaults', ['image', 'working_dir'])
 
 log = logging.getLogger(__name__) #pylint: disable=invalid-name
-
-import logging
 
 class Translated(object):
     """
