@@ -24,8 +24,38 @@ class Translated(object):
             warnings=self.warnings + other.warnings
         )
 
-def apply_mapping(mapping: dict, data: dict, error_location: str):
 
+def apply_mapping(mapping: dict, data: dict, error_location: str):
+    """
+    >>> mapper = lambda n: Translated({"outer": [{"inner": n*2}]})
+    >>> result, _ = apply_mapping({"foo": mapper}, {"foo": 21}, "")
+    >>> result == {"outer": [{"inner": 42}]}
+    True
+
+    >>> mapper = lambda d: Translated({"product": d['foo'] * d['bar']})
+    >>> result, _ = apply_mapping({("foo", "bar"): mapper}, {"foo": 21, "bar": 2}, "")
+    >>> result == {"product": 42}
+    True
+
+    >>> mapper = lambda n: Translated({"result": n})
+    >>> apply_mapping({"foo": mapper}, {"foo": 1, "bar": 2, "baz": 0}, "app")
+    Traceback (most recent call last):
+        ...
+    RuntimeError: "app" has fields "bar", "baz" that are not present in the field mappings
+
+    >>> mapper = lambda n: Translated({"result": n})
+    >>> apply_mapping({"foo": mapper, "bar": mapper}, {"foo": 1, "bar": 2}, "app")
+    Traceback (most recent call last):
+        ...
+    Exception: Error composing the result object for "app": Conflicting values for .result: 2 and 1
+
+    >>> broken_mapper = lambda n: str(n)
+    >>> apply_mapping({"foo": broken_mapper}, {"foo": 1}, "app")
+    Traceback (most recent call last):
+        ...
+    Exception: Bad translation result in "app" for key "foo"
+
+    """
     def map_group(group, mapper):
         if isinstance(group, tuple):
             fields = set(group) & data.keys()
@@ -46,7 +76,7 @@ def apply_mapping(mapping: dict, data: dict, error_location: str):
         mapper = mapping[key]
         mapped_app_fields, translated = map_group(key, mapper)
         if not isinstance(translated, Translated):
-            raise Exception("Bad translation result: {}, key {}".format(error_location, key))
+            raise Exception('Bad translation result in "{}" for key "{}"'.format(error_location, key))
 
         warnings += ['"{}": {}'.format(key, warn) for warn in translated.warnings]
 
@@ -54,7 +84,7 @@ def apply_mapping(mapping: dict, data: dict, error_location: str):
             result = deep_merge(result, translated.update)
         except UpdateConflict as err:
             raise Exception(
-                "Error composing the result object for {}: {}".format(error_location, err))
+                'Error composing the result object for "{}": {}'.format(error_location, err))
 
         unknown -= mapped_app_fields
 
@@ -63,8 +93,8 @@ def apply_mapping(mapping: dict, data: dict, error_location: str):
         # The fields that cannot or should not be mapped should be explicitly added
         # into the corresponding `generate_..._mappings()` function.
         raise RuntimeError(
-            "An {} has fields {} that are not present in the field mappings".format(
-                error_location, '\n'.join(sorted(unknown))))
+            '"{}" has fields {} that are not present in the field mappings'.format(
+                error_location, ', '.join('"{}"'.format(_) for _ in sorted(unknown))))
 
     return result, warnings
 
