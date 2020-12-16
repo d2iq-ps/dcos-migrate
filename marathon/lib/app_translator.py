@@ -1,5 +1,7 @@
 import json
 import logging
+import os.path
+
 from collections import namedtuple
 
 Settings = namedtuple('Settings', ['container_defaults', 'imported_k8s_secret_name'])
@@ -7,8 +9,6 @@ Settings = namedtuple('Settings', ['container_defaults', 'imported_k8s_secret_na
 ContainerDefaults = namedtuple('ContainerDefaults', ['image', 'working_dir'])
 
 log = logging.getLogger(__name__) #pylint: disable=invalid-name
-
-import logging
 
 class Translated(object):
     """
@@ -24,8 +24,38 @@ class Translated(object):
             warnings=self.warnings + other.warnings
         )
 
-def apply_mapping(mapping: dict, data: dict, error_location: str):
 
+def apply_mapping(mapping: dict, data: dict, error_location: str):
+    """
+    >>> mapper = lambda n: Translated({"outer": [{"inner": n*2}]})
+    >>> result, _ = apply_mapping({"foo": mapper}, {"foo": 21}, "")
+    >>> result == {"outer": [{"inner": 42}]}
+    True
+
+    >>> mapper = lambda d: Translated({"product": d['foo'] * d['bar']})
+    >>> result, _ = apply_mapping({("foo", "bar"): mapper}, {"foo": 21, "bar": 2}, "")
+    >>> result == {"product": 42}
+    True
+
+    >>> mapper = lambda n: Translated({"result": n})
+    >>> apply_mapping({"foo": mapper}, {"foo": 1, "bar": 2, "baz": 0}, "app")
+    Traceback (most recent call last):
+        ...
+    RuntimeError: "app" has fields "bar", "baz" that are not present in the field mappings
+
+    >>> mapper = lambda n: Translated({"result": n})
+    >>> apply_mapping({"foo": mapper, "bar": mapper}, {"foo": 1, "bar": 2}, "app")
+    Traceback (most recent call last):
+        ...
+    Exception: Error composing the result object for "app": Conflicting values for .result: 2 and 1
+
+    >>> broken_mapper = lambda n: str(n)
+    >>> apply_mapping({"foo": broken_mapper}, {"foo": 1}, "app")
+    Traceback (most recent call last):
+        ...
+    Exception: Bad translation result in "app" for key "foo"
+
+    """
     def map_group(group, mapper):
         if isinstance(group, tuple):
             fields = set(group) & data.keys()
@@ -46,7 +76,7 @@ def apply_mapping(mapping: dict, data: dict, error_location: str):
         mapper = mapping[key]
         mapped_app_fields, translated = map_group(key, mapper)
         if not isinstance(translated, Translated):
-            raise Exception("Bad translation result: {}, key {}".format(error_location, key))
+            raise Exception('Bad translation result in "{}" for key "{}"'.format(error_location, key))
 
         warnings += ['"{}": {}'.format(key, warn) for warn in translated.warnings]
 
@@ -54,7 +84,7 @@ def apply_mapping(mapping: dict, data: dict, error_location: str):
             result = deep_merge(result, translated.update)
         except UpdateConflict as err:
             raise Exception(
-                "Error composing the result object for {}: {}".format(error_location, err))
+                'Error composing the result object for "{}": {}'.format(error_location, err))
 
         unknown -= mapped_app_fields
 
@@ -63,8 +93,8 @@ def apply_mapping(mapping: dict, data: dict, error_location: str):
         # The fields that cannot or should not be mapped should be explicitly added
         # into the corresponding `generate_..._mappings()` function.
         raise RuntimeError(
-            "An {} has fields {} that are not present in the field mappings".format(
-                error_location, '\n'.join(sorted(unknown))))
+            '"{}" has fields {} that are not present in the field mappings'.format(
+                error_location, ', '.join('"{}"'.format(_) for _ in sorted(unknown))))
 
     return result, warnings
 
@@ -122,6 +152,10 @@ class MissingSecretSource(Exception):
     pass
 
 class AdditionalFlagNeeded(Exception):
+    """
+    Used to indicate that for migrating this specific app the user is obliged
+    to specify a flag which could otherwise have been omitted.
+    """
     pass
 
 
@@ -301,7 +335,6 @@ def translate_fetch(fetches, artifacts_volume_name):
     def iter_command():
         yield 'set -x'
         yield 'set -e'
-        yield 'cd /fetch_artifacts'
         yield 'FETCH_PID_ARRAY=()'
 
         for fetch in fetches:
@@ -334,6 +367,7 @@ def translate_fetch(fetches, artifacts_volume_name):
                     "name": artifacts_volume_name,
                     "mountPath": "/fetch_artifacts"
                 }],
+                "workingDir": "/fetch_artifacts",
             }],
             "volumes": [{"name": artifacts_volume_name, "emptyDir": {}}]
         }),
@@ -363,7 +397,7 @@ def get_container_translator(defaults: ContainerDefaults, error_location):
             if defaults.image:
                 container['image'] = defaults.image
             else:
-                raise RuntimeError(
+                raise AdditionalFlagNeeded(
                     '{} has no image; please specify non-empty `--default-image` and run again'.format(error_location)
                 )
 
@@ -373,7 +407,7 @@ def get_container_translator(defaults: ContainerDefaults, error_location):
         fetch = Translated()
         if fields.get('fetch'):
             if not defaults.working_dir:
-                raise RuntimeError(
+                raise AdditionalFlagNeeded(
                     '{} is using "fetch"; please specify non-empty `--container-working-dir` and run again'.format(error_location)
                 )
 
@@ -452,6 +486,13 @@ def deep_merge(first, second, debug_prefix=''):
     >>> result == {3: [{"foo": "bar", "bar": "baz"}, "deadbeef"]}
     True
 
+    >>> deep_merge({"foo": 1}, {"foo": 1}) == {"foo": 1}
+    True
+
+    >>> deep_merge({"foo": 1}, {"foo": 2}) # doctest: +IGNORE_EXCEPTION_DETAIL
+    Traceback (most recent call last):
+        ...
+    UpdateConflict: Conflicting values for .foo: 1 and 2
     """
     if all(isinstance(_, dict) for _ in (first, second)):
         def iter_items():
