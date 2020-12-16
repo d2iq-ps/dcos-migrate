@@ -28,12 +28,11 @@ positional arguments:
   {backup,install,migrate}
                         sub-commands available
     backup              Backup the DC/OS package configurations and data
-    install             Translate the MesosCloud based configs to
-                        KubernetesCloud based configs and print install
+    install             Translate the DC/OS based configs to
+                        KUDO based configs and print install
                         instructions.
     migrate             Restore the Schema and Data from the backup of
-                        MesosCloud based Cassandra to KubernetesCloud based
-                        Cassandra
+                        DC/OS Cassandra to KUDO Cassandra
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -44,7 +43,7 @@ optional arguments:
 At a higher level, migration can be seen as three steps:
 
 1. Backup the DC/OS Cassandra configurations locally, as well as support backup of metadata and data on S3.
-2. Install Cassandra on Konvoy by translating the above downloaded configuration and adding other customization
+2. Install Cassandra on Konvoy by translating the above downloaded configuration and adding other customization.
 3. Optional, If any schema and data backup available on S3, restore it in Cassandra on Konvoy.
 
 These steps are explained in following steps:
@@ -77,23 +76,22 @@ optional arguments:
   --app-version APP_VERSION
                         Service Version (defaults to 2.10.0-3.11.6)
   --snapshot-name SNAPSHOT_NAME
-                        Snapshot or Backup Name (no default, if --only-
-                        conf=False, it would be required)
+                        Snapshot or Backup Name (required, not applicable 
+                        if --only-conf=True)
   --bucket-name BUCKET_NAME
-                        S3 Bucket Name (no default, if --only-conf=False, it
-                        would be required)
+                        S3 Bucket Name (required, not applicable if
+                        --only-conf=True)
   --keyspaces KEYSPACES
                         Comma separated list of keyspace names for the Backup
-                        (no default, optional)
-  --aws-key AWS_KEY     AWS Access Key ID (no default, if --only-conf=False,
-                        it would be required)
+  --aws-key AWS_KEY     AWS Access Key ID (required, not applicable if
+                        --only-conf=True)
   --aws-secret AWS_SECRET
-                        AWS Secret Access Key (no default, if --only-
-                        conf=False, it would be required)
+                        AWS Secret Access Key (required, not applicable if
+                        --only-conf=True)
   --aws-session-id AWS_SESSION_ID
-                        AWS Session ID (no default, optional)
+                        AWS Session ID
   --aws-session-token AWS_SESSION_TOKEN
-                        AWS Session Token (no default, optional)
+                        AWS Session Token
   --aws-region AWS_REGION
                         AWS Region (defautls to us-west-2)
   --https-proxy HTTPS_PROXY
@@ -137,7 +135,7 @@ optional arguments:
 
 ### `3.migrate`
 
-The `migrate` command is to be used when you have data backup taken in S3 from DC/OS Cassandra. This command will restore the data backup taken of DC/OS Cassandra to KUDO Cassandra.
+The `migrate` command is to be used when you have data backup taken in S3 from DC/OS Cassandra. This command will restore the data backup taken from DC/OS Cassandra to KUDO Cassandra.
 
 ```
 ➜ python3 ./cassandra/scripts/main.py migrate --help
