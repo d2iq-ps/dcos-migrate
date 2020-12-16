@@ -124,7 +124,7 @@ def main():
     migrate_cmd.add_argument("--bucket-name", type=str, required=True, help="S3 Bucket Name, without s3:// prefix")
     migrate_cmd.add_argument("--aws-key", type=str, required=True, help="AWS Access Key ID")
     migrate_cmd.add_argument("--aws-secret", type=str, required=True, help="AWS Secret Access Key")
-    migrate_cmd.add_argument("--aws-session-token", type=str, default="", help="AWS Session Token (no default, optional)")
+    migrate_cmd.add_argument("--aws-session-token", type=str, default="", help="AWS Session Token")
     migrate_cmd.add_argument("--aws-region", type=str, default="us-west-2", help="AWS Region (defautls to us-west-2)")
     migrate_cmd.set_defaults(func=migrate)
 

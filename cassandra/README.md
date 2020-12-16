@@ -28,11 +28,10 @@ positional arguments:
   {backup,install,migrate}
                         sub-commands available
     backup              Backup the DC/OS package configurations and data
-    install             Translate the DC/OS based configs to
-                        KUDO based configs and print install
-                        instructions.
-    migrate             Restore the Schema and Data from the backup of
-                        DC/OS Cassandra to KUDO Cassandra
+    install             Translate the DC/OS based configs to KUDO based
+                        configs and print install instructions.
+    migrate             Restore the Schema and Data from the backup of DC/OS
+                        Cassandra to KUDO Cassandra
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -76,15 +75,15 @@ optional arguments:
   --app-version APP_VERSION
                         Service Version (defaults to 2.10.0-3.11.6)
   --snapshot-name SNAPSHOT_NAME
-                        Snapshot or Backup Name (required, not applicable 
-                        if --only-conf=True)
-  --bucket-name BUCKET_NAME
-                        S3 Bucket Name (required, not applicable if
+                        Snapshot or Backup Name (required, not applicable if
                         --only-conf=True)
+  --bucket-name BUCKET_NAME
+                        S3 Bucket Name, without s3:// prefix (required, not
+                        applicable if --only-conf=True)
   --keyspaces KEYSPACES
                         Comma separated list of keyspace names for the Backup
-  --aws-key AWS_KEY     AWS Access Key ID (required, not applicable if
-                        --only-conf=True)
+  --aws-key AWS_KEY     AWS Access Key ID (required, not applicable if --only-
+                        conf=True)
   --aws-secret AWS_SECRET
                         AWS Secret Access Key (required, not applicable if
                         --only-conf=True)
@@ -157,12 +156,12 @@ optional arguments:
   --snapshot-name SNAPSHOT_NAME
                         Snapshot or Backup Name
   --bucket-name BUCKET_NAME
-                        S3 Bucket Name
+                        S3 Bucket Name, without s3:// prefix
   --aws-key AWS_KEY     AWS Access Key ID
   --aws-secret AWS_SECRET
                         AWS Secret Access Key
   --aws-session-token AWS_SESSION_TOKEN
-                        AWS Session Token (no default, optional)
+                        AWS Session Token
   --aws-region AWS_REGION
                         AWS Region (defautls to us-west-2)
 ```
