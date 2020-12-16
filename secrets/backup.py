@@ -80,6 +80,18 @@ class DCOSSecretsService:
         return response
 
 
+def get_dcos_cluster_id(dcos_cli) -> str:
+    p = subprocess.run(
+        [dcos_cli, 'cluster', 'list', '--attached', '--json'],
+        stdout=subprocess.PIPE,
+        timeout=10 * 60,
+        check=True,
+    )
+    j = json.loads(p.stdout)
+    print(j)
+    return j[0]['cluster_id']
+
+
 def get_dcos_truststore(dcos_url: str) -> str:
     # Download the CA certificate for the cluster to verify subsequent connections. Since we don't
     # yet have the CA certificate, this request cannot be verified (and hence is insecure).
@@ -121,6 +133,7 @@ def run(argv: List[str]) -> None:
     args = parser.parse_args(argv)
     path = args.path
 
+    cluster_id = get_dcos_cluster_id(DCOS)
     url = get_dcos_url(DCOS)
     token = get_dcos_token(DCOS)
     trust = get_dcos_truststore(url)
@@ -139,13 +152,17 @@ def run(argv: List[str]) -> None:
             # Expect path to name a specific secret
             secrets.append(s.get(path, ''))
 
+        output = {
+            'cluster_id': cluster_id,
+            'secrets': secrets
+        }
         if args.target_file is None:
             f = sys.stdout
         else:
             # To protect secrets open with read/write permissions only for owner
             f = os.fdopen(os.open(args.target_file, os.O_WRONLY | os.O_CREAT, 0o600), 'w')
         try:
-            json.dump(secrets, f, indent=2, sort_keys=True)
+            json.dump(output, f, indent=2, sort_keys=True)
         finally:
             if args.target_file is not None:
                 f.close()

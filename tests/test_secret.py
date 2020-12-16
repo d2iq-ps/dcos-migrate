@@ -155,6 +155,7 @@ class TestSecrets:
 
             # Setup DCOSSecretsService client
 
+            dcos_cluster_id = backup.get_dcos_cluster_id(cli.path)
             url = backup.get_dcos_url(cli.path)
             token = backup.get_dcos_token(cli.path)
             trust = backup.get_dcos_truststore(url)
@@ -273,7 +274,7 @@ class TestSecrets:
             assert stat.S_IMODE(dcosfile1.stat().st_mode) == 0o600
             with dcosfile1.open() as f:
                 response = json.load(f)
-            keys = set(s['key'] for s in response)
+            keys = set(s['key'] for s in response['secrets'])
             assert keys == {'key1', 'folder/key2', 'folder/key3', 'folder/sub', 'folder/sub/key4'}
 
             dcosfile2 = tmp_path / 'output-2'
@@ -281,7 +282,7 @@ class TestSecrets:
             assert stat.S_IMODE(dcosfile2.stat().st_mode) == 0o600
             with dcosfile2.open() as f:
                 response = json.load(f)
-            keys = set(s['key'] for s in response)
+            keys = set(s['key'] for s in response['secrets'])
             assert keys == {'key2', 'key3', 'sub', 'sub/key4'}
 
             # When backing up a path that is a secret and a folder, only the secrets under the
@@ -291,14 +292,14 @@ class TestSecrets:
             assert stat.S_IMODE(dcosfile3.stat().st_mode) == 0o600
             with dcosfile3.open() as f:
                 response = json.load(f)
-            keys = set(s['key'] for s in response)
+            keys = set(s['key'] for s in response['secrets'])
             assert keys == {'key4'}
 
             dcosfile4 = tmp_path / 'output-4'
             backup.run(['--path', 'folder/sub/key4', '--target-file', str(dcosfile4)])
             assert stat.S_IMODE(dcosfile4.stat().st_mode) == 0o600
             with dcosfile4.open() as f:
-                response = json.load(f)
+                response = json.load(f)['secrets']
             assert len(response) == 1
             s = response[0]
             assert s['path'] == 'folder/sub'
@@ -315,6 +316,14 @@ class TestSecrets:
         assert stat.S_IMODE(k8sfile.stat().st_mode) == 0o600
         with k8sfile.open() as f:
             response = json.load(f)
+        assert response['metadata']['labels']['dcos-cluster-id'] == dcos_cluster_id
+        assert sorted(json.loads(response['metadata']['annotations']['dcos-secret']).items()) == [
+            ('folder.key2', 'folder/key2'),
+            ('folder.key3', 'folder/key3'),
+            ('folder.sub', 'folder/sub'),
+            ('folder.sub.key4', 'folder/sub/key4'),
+            ('key1', 'key1'),
+        ]
         keys = response['data'].keys()
         assert keys == {'key1', 'folder.key2', 'folder.key3', 'folder.sub', 'folder.sub.key4'}
 
@@ -327,6 +336,10 @@ class TestSecrets:
         assert stat.S_IMODE(k8sfile_4.stat().st_mode) == 0o600
         with k8sfile_4.open() as f:
             response = json.load(f)
+        assert response['metadata']['labels']['dcos-cluster-id'] == dcos_cluster_id
+        assert json.loads(response['metadata']['annotations']['dcos-secret']) == {
+            'key4': 'folder/sub/key4'
+        }
         keys = response['data'].keys()
         assert keys == {'key4'}
 
@@ -363,6 +376,7 @@ class TestSecrets:
             )
             assert b'secret/mysecrets created' in p.stdout
 
+            # Check that the Secret resource has the expected keys and values.
             p = subprocess.run(
                 [
                     str(kubectl_path),
@@ -381,6 +395,31 @@ class TestSecrets:
                 check=True
             )
             assert base64.b64decode(p.stdout.decode('ascii')).decode('utf-8') == value1
+
+            # Check that we can search for secrets by cluster id and find the original DC/OS path
+            # for a secret.
+            p = subprocess.run(
+                [
+                    str(kubectl_path),
+                    '--kubeconfig',
+                    str(kubeconfig_path),
+                    '--context',
+                    kind_context,
+                    'get',
+                    'secrets',
+                    '-l',
+                    'dcos-cluster-id={}'.format(dcos_cluster_id),
+                    '-o',
+                    'json'
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=True
+            )
+            items = json.loads(p.stdout)['items']
+            assert len(items) == 1
+            reverse_map = json.loads(items[0]['metadata']['annotations']['dcos-secret'])
+            assert reverse_map['folder.sub.key4'] == 'folder/sub/key4'
         finally:
             subprocess.run([
                 str(kind_path), 'delete', 'cluster', '--kubeconfig', str(kubeconfig_path)
