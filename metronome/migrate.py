@@ -86,7 +86,7 @@ def generate_fetch_command(uri: str, allow_extract: bool, executable: bool):
 ###############################################################################
 
 
-def translate_schedule_prop(key, val, result):
+def translate_schedule_prop(key, val, json_spec, result):
     def update(props):
         return deep_merge(result, props)
 
@@ -100,7 +100,9 @@ def translate_schedule_prop(key, val, result):
         return update({"spec": {"suspend": not val}})
 
     if ".schedules.0.id" == key:
-        return update({"metadata": {"name": dnsify(val)}})
+        # that's what schedules are called by default. metronome does not seem to care about multiple schedules having the same id...
+        name = dnsify(val) if val != "default" else dnsify(json_spec["id"])
+        return update({"metadata": {"name": name}})
 
     if ".schedules.0.nextRunAt" == key:
         return result  # Ignore!
@@ -115,7 +117,7 @@ def translate_schedule_prop(key, val, result):
             )
         return result
 
-    print(f"Unexpected property '{key}'!")
+    warn(f"Unexpected property '{key}'!")
     return result
 
 
@@ -409,7 +411,7 @@ def translate(args):
         }
 
         for k, v in schedule_props:
-            cron_job = translate_schedule_prop(k, v, cron_job)
+            cron_job = translate_schedule_prop(k, v, json_spec, cron_job)
 
         print(yaml.safe_dump(cron_job))
 
