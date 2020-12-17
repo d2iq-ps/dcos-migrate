@@ -32,7 +32,7 @@ def parse_backup_restore_params(args) -> dict:
     parsed_params["AWS_SECRET_ACCESS_KEY"] = args.aws_secret
     parsed_params["AWS_REGION"] = args.aws_region
 
-    if hasattr(args, 'https_proxy'):
+    if hasattr(args, 'https_proxy') and len(args.https_proxy) != 0:
         parsed_params["HTTPS_PROXY"] = args.https_proxy
     if hasattr(args, 'aws_session_id') and len(args.aws_session_id) != 0:
         parsed_params["AWS_SESSION_ID"] = args.aws_session_id
@@ -99,7 +99,7 @@ def main():
     backup_cmd.add_argument("--aws-session-id", type=str, default="", help="AWS Session ID")
     backup_cmd.add_argument("--aws-session-token", type=str, default="", help="AWS Session Token")
     backup_cmd.add_argument("--aws-region", type=str, default="us-west-2", help="AWS Region (defautls to us-west-2)")
-    backup_cmd.add_argument("--https-proxy", type=str, default="http://internal.proxy:8080", help="HTTPs Proxy (defaults to http://internal.proxy:8080)")
+    backup_cmd.add_argument("--https-proxy", type=str, default="", help="HTTPs Proxy")
     backup_cmd.set_defaults(func=download)
 
     # Step 2 : Migrate the configs from DC/OS Cassandra format to KUDO Cassandra format and print install instructions
@@ -110,7 +110,7 @@ def main():
     install_cmd.add_argument("--namespace", type=str, default="default", help="Namespace of the cassandra pods (defaults to default)")
     install_cmd.add_argument("--instance", type=str, default="cassandra-instance",
                              help="Name of the Cassandra Kudo installation (defaults to cassandra-instance)")
-    install_cmd.add_argument("--operator-version", type=str, default="3.11.5-0.1.2", help="Kudo Cassandra version (defaults to 3.11.5-0.1.2)")
+    install_cmd.add_argument("--operator-version", type=str, default="0.1.2", help="Kudo Cassandra version (defaults to 0.1.2)")
     install_cmd.set_defaults(func=install)
 
     # Step 3 : Migrate the schema and data from DC/OS Cassandra to KUDO Cassandra

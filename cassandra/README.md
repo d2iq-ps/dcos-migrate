@@ -94,7 +94,7 @@ optional arguments:
   --aws-region AWS_REGION
                         AWS Region (defautls to us-west-2)
   --https-proxy HTTPS_PROXY
-                        HTTPs Proxy (defaults to http://internal.proxy:8080)
+                        HTTPs Proxy
 ```
 
 `TARGET_DIR` defaults to `$(pwd)/cassandra_home`. `--only-conf` option can be set to `True` if you want to avoid any kind of data backup and only wants to migrate cassandra service.
@@ -128,7 +128,7 @@ optional arguments:
   --instance INSTANCE   Name of the Cassandra Kudo installation (defaults to
                         cassandra-instance)
   --operator-version OPERATOR_VERSION
-                        Kudo Cassandra version (defaults to 3.11.5-0.1.2)
+                        Kudo Cassandra version (defaults to 0.1.2)
 ```
 
 
@@ -192,7 +192,7 @@ Following is a sample output of running through all the commands. Note that all 
 --------------------------------------------------
 Run following command to trigger the Schema and Data backup:
 
-dcos cassandra --name=cassandra plan start backup-s3 -p "SNAPSHOT_NAME=cassandra_backup" -p "S3_BUCKET_NAME=mybucket" -p "AWS_ACCESS_KEY_ID=ABCDEFGHIJKLMNOPQRSTUVWXYZ" -p "AWS_SECRET_ACCESS_KEY=AbC/+123/xyZ" -p "AWS_REGION=us-west-2" -p "HTTPS_PROXY=http://internal.proxy:8080"
+dcos cassandra --name=cassandra plan start backup-s3 -p "SNAPSHOT_NAME=cassandra_backup" -p "S3_BUCKET_NAME=mybucket" -p "AWS_ACCESS_KEY_ID=ABCDEFGHIJKLMNOPQRSTUVWXYZ" -p "AWS_SECRET_ACCESS_KEY=AbC/+123/xyZ" -p "AWS_REGION=us-west-2"
 --------------------------------------------------
 
 Run following command to check the backup status:
@@ -203,10 +203,32 @@ Note: Make sure backup plan is completed to go forward.
 --------------------------------------------------
 ```
 
+Backup plan status should look as follows:
+
+```
+backup-s3 (serial strategy) (COMPLETE)
+├─ backup-schema (serial strategy) (COMPLETE)
+│  ├─ node-0:[backup-schema] (COMPLETE)
+│  ├─ node-1:[backup-schema] (COMPLETE)
+│  └─ node-2:[backup-schema] (COMPLETE)
+├─ create-snapshots (dependency strategy) (COMPLETE)
+│  ├─ node-0:[snapshot] (COMPLETE)
+│  ├─ node-1:[snapshot] (COMPLETE)
+│  └─ node-2:[snapshot] (COMPLETE)
+├─ upload-backups (serial strategy) (COMPLETE)
+│  ├─ node-0:[upload-s3] (COMPLETE)
+│  ├─ node-1:[upload-s3] (COMPLETE)
+│  └─ node-2:[upload-s3] (COMPLETE)
+└─ cleanup-snapshots (serial strategy) (COMPLETE)
+   ├─ node-0:[cleanup-snapshot] (COMPLETE)
+   ├─ node-1:[cleanup-snapshot] (COMPLETE)
+   └─ node-2:[cleanup-snapshot] (COMPLETE)
+```
+
 `translate`
 
 ```
-➜ python3 ./cassandra/scripts/main.py install -c $(pwd)/cassandra_home/cassandra_env.json -t $(pwd)/cassandra_home/params.yml --namespace default --instance cassandra-instance --operator-version 3.11.5-0.1.2
+➜ python3 ./cassandra/scripts/main.py install -c $(pwd)/cassandra_home/cassandra_env.json -t $(pwd)/cassandra_home/params.yml --namespace default --instance cassandra-instance --operator-version 0.1.2
 
 [2020-11-20 08:40:31,631]  INFO {main.py:57} - Translating Mesos configurations to K8s configurations
 [2020-11-20 08:40:31,632]  INFO {translate.py:76} - Using "<user_path>/dcos-migration/cassandra_home/cassandra_env.json" file to migrate to kubernetes configuration at "<user_path>/dcos-migration/cassandra_home/params.yml"
@@ -216,7 +238,7 @@ kubectl kudo install \
     --namespace default \
     --instance cassandra-instance \
     --parameter-file <user_path>/dcos-migration/cassandra_home/params.yml \
-    --operator-version 3.11.5-0.1.2 \
+    --operator-version 0.1.2 \
     cassandra
 
 --------------------------------------------------
