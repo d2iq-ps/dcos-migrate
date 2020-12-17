@@ -19,6 +19,9 @@ from passlib.hash import sha512_crypt
 
 from secrets import backup, migrate
 
+# Prefix for metadata label and annotation keys
+DCOS_PREFIX = 'dcos-migration.d2iq.com'
+
 PRIVATE_KEY = """
 -----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7zYQ8wdXCQQrj
@@ -316,12 +319,14 @@ class TestSecrets:
         assert stat.S_IMODE(k8sfile.stat().st_mode) == 0o600
         with k8sfile.open() as f:
             response = json.load(f)
-        assert response['metadata']['labels']['dcos-cluster-id'] == dcos_cluster_id
-        assert sorted(json.loads(response['metadata']['annotations']['dcos-secret']).items()) == [
-            ('folder.key2', 'folder/key2'),
-            ('folder.key3', 'folder/key3'),
-            ('folder.sub', 'folder/sub'),
-            ('folder.sub.key4', 'folder/sub/key4'),
+        assert response['metadata']['labels'][DCOS_PREFIX + '/dcos-cluster-id'] == dcos_cluster_id
+        assert sorted(
+            json.loads(response['metadata']['annotations'][DCOS_PREFIX + '/dcos-secret']).items()
+        ) == [
+            ('folder/key2', 'folder.key2'),
+            ('folder/key3', 'folder.key3'),
+            ('folder/sub', 'folder.sub'),
+            ('folder/sub/key4', 'folder.sub.key4'),
             ('key1', 'key1'),
         ]
         keys = response['data'].keys()
@@ -336,9 +341,9 @@ class TestSecrets:
         assert stat.S_IMODE(k8sfile_4.stat().st_mode) == 0o600
         with k8sfile_4.open() as f:
             response = json.load(f)
-        assert response['metadata']['labels']['dcos-cluster-id'] == dcos_cluster_id
-        assert json.loads(response['metadata']['annotations']['dcos-secret']) == {
-            'key4': 'folder/sub/key4'
+        assert response['metadata']['labels'][DCOS_PREFIX + '/dcos-cluster-id'] == dcos_cluster_id
+        assert json.loads(response['metadata']['annotations'][DCOS_PREFIX + '/dcos-secret']) == {
+            'folder/sub/key4': 'key4'
         }
         keys = response['data'].keys()
         assert keys == {'key4'}
@@ -408,7 +413,7 @@ class TestSecrets:
                     'get',
                     'secrets',
                     '-l',
-                    'dcos-cluster-id={}'.format(dcos_cluster_id),
+                    '{}/dcos-cluster-id={}'.format(DCOS_PREFIX, dcos_cluster_id),
                     '-o',
                     'json'
                 ],
@@ -418,8 +423,10 @@ class TestSecrets:
             )
             items = json.loads(p.stdout)['items']
             assert len(items) == 1
-            reverse_map = json.loads(items[0]['metadata']['annotations']['dcos-secret'])
-            assert reverse_map['folder.sub.key4'] == 'folder/sub/key4'
+            reverse_map = json.loads(
+                items[0]['metadata']['annotations'][DCOS_PREFIX + '/dcos-secret']
+            )
+            assert reverse_map['folder/sub/key4'] == 'folder.sub.key4'
         finally:
             subprocess.run([
                 str(kind_path), 'delete', 'cluster', '--kubeconfig', str(kubeconfig_path)

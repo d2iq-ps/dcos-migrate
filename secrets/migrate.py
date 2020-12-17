@@ -54,7 +54,7 @@ def run(argv: List[str]) -> None:
             f.close()
 
     k8s_data = {}
-    reverse_map = {}
+    name_map = {}
     for secret in dcos_secrets['secrets']:
         k8s_key = clean_key(secret['key'])
         if k8s_key in k8s_data:
@@ -66,7 +66,8 @@ def run(argv: List[str]) -> None:
                 candidate = k8s_key + str(i)
             k8s_key = candidate
         k8s_data[k8s_key] = secret['value']
-        reverse_map[k8s_key] = '{}/{}'.format(secret['path'], secret['key']).strip('/')
+        dcos_path = '{}/{}'.format(secret['path'], secret['key']).strip('/')
+        name_map[dcos_path] = k8s_key
 
     k8s_data = {clean_key(secret['key']): secret['value'] for secret in dcos_secrets['secrets']}
     k8s_secret = {
@@ -76,12 +77,12 @@ def run(argv: List[str]) -> None:
             "namespace": args.namespace.lower(),
             "name": args.name.lower(),
             "labels": {
-                "dcos-cluster-id": dcos_secrets['cluster_id'],
+                "dcos-migration.d2iq.com/dcos-cluster-id": dcos_secrets['cluster_id'],
             },
             "annotations": {
                 # Need to double serialize because annotations must have string values:
                 # https://github.com/kubernetes/kubernetes/issues/12226
-                "dcos-secret": json.dumps(reverse_map),
+                "dcos-migration.d2iq.com/dcos-secret": json.dumps(name_map),
             }
         },
         "type": "Opaque",

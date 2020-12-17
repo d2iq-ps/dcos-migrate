@@ -88,7 +88,6 @@ def get_dcos_cluster_id(dcos_cli) -> str:
         check=True,
     )
     j = json.loads(p.stdout)
-    print(j)
     return j[0]['cluster_id']
 
 
