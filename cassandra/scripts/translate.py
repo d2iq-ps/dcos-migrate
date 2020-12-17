@@ -1,3 +1,4 @@
+import math
 import os
 import json
 import logging as log
@@ -38,6 +39,7 @@ NODE_MEM_LIMIT_MIB
 NODE_DISK_SIZE_GIB
 NODE_TOPOLOGY
 EXTERNAL_SEED_NODES
+OTC_COALESCING_STRATEGY should be one of these [disabled fixed movingaverage timehorizon]
 """
 
 
@@ -55,7 +57,7 @@ def print_instructions(namespace: str, instance: str, target_file: str, version:
     KUDO_STATUS_CMD = """
 {kubectl} kudo plan status \\
     --namespace {namespace} \\
-    --instance {instance}"
+    --instance {instance}
 """
 
     print(separator)
@@ -92,7 +94,13 @@ def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
         tmpl_lines = f.readlines()
     
     # Convert Disk Size from MB to GiB
-    src_envs["CASSANDRA_DISK_GB"] = str(int(src_envs["CASSANDRA_DISK_MB"])/1024)
+    src_envs["CASSANDRA_DISK_GB"] = str(math.ceil(float(src_envs["CASSANDRA_DISK_MB"])/1024))
+
+    # Round of the value of CPU
+    src_envs["CASSANDRA_CPUS"] = str(math.ceil(float(src_envs["CASSANDRA_CPUS"])))
+
+    # Make sure value is in lowercase
+    src_envs["CASSANDRA_OTC_COALESCING_STRATEGY"] = src_envs["CASSANDRA_OTC_COALESCING_STRATEGY"].lower()
 
     # Convert Cassandra Rack-awareness to K8s Cassandra Node Topology
     if src_envs["PLACEMENT_REFERENCED_ZONE"] == "true":
@@ -109,5 +117,5 @@ def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
             tmpl_key, tmpl_value = tmpl.split(':')
             tmpl_value = tmpl_value.strip()
             if tmpl_value in src_envs and len(src_envs[tmpl_value]) > 0:
-                f.write(tmpl_key + ": " + src_envs[tmpl_value] + '\n')
+                f.write(tmpl_key + ": \"" + src_envs[tmpl_value] + '"\n')
     return True

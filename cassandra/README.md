@@ -254,12 +254,13 @@ NODE_MEM_LIMIT_MIB
 NODE_DISK_SIZE_GIB
 NODE_TOPOLOGY
 EXTERNAL_SEED_NODES
+OTC_COALESCING_STRATEGY should be one of these [disabled fixed movingaverage timehorizon]
 
 --------------------------------------------------
 Run the following command to check the status: 
 kubectl kudo plan status \
     --namespace default \
-    --instance=cassandra-instance"
+    --instance=cassandra-instance
 
 --------------------------------------------------
 Make sure plan shows COMPELTE, before proceeding further.
