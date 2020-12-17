@@ -254,7 +254,8 @@ NODE_MEM_LIMIT_MIB
 NODE_DISK_SIZE_GIB
 NODE_TOPOLOGY
 EXTERNAL_SEED_NODES
-OTC_COALESCING_STRATEGY should be one of these [disabled fixed movingaverage timehorizon]
+OTC_COALESCING_STRATEGY - value should be one of these [disabled fixed movingaverage timehorizon]
+ENDPOINT_SNITCH - if GossipingPropertyFileSnitch not working, use SimpleSnitch
 
 --------------------------------------------------
 Run the following command to check the status: 
