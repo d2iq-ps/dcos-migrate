@@ -97,7 +97,7 @@ def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
     src_envs["CASSANDRA_DISK_GB"] = str(math.ceil(float(src_envs["CASSANDRA_DISK_MB"])/1024))
 
     # Round of the value of CPU
-    src_envs["CASSANDRA_CPUS"] = str(math.ceil(float(src_envs["CASSANDRA_CPUS"])))
+    src_envs["CASSANDRA_CPUS"] = str(math.ceil(float(src_envs["CASSANDRA_CPUS"]) * 1000))
 
     # Make sure value is in lowercase
     src_envs["CASSANDRA_OTC_COALESCING_STRATEGY"] = src_envs["CASSANDRA_OTC_COALESCING_STRATEGY"].lower()
