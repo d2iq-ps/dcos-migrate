@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-
 import argparse
 import json
 import os
 import re
-import requests
 import subprocess
 import sys
-
 
 # This script relies on python-yaml installed via pip, system package manager or some other means.
 import yaml
@@ -46,7 +43,8 @@ def clean_key(s: str) -> str:
 
 
 def dcos(cmd: str):
-    status, out = subprocess.getstatusoutput(f"{os.getenv('DCOS_CLI', 'dcos')} {cmd}")
+    status, out = subprocess.getstatusoutput(f"dcos {cmd}")
+
     if status != 0:
         raise RuntimeError(f"cmd '{cmd}' failed with status {status}: {out}")
     return out
