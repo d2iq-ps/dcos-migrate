@@ -14,7 +14,8 @@ def is_valid_dns_label(s: str) -> bool:
 
 
 def is_valid_dns_subdomain(s: str) -> bool:
-    # One or more lowercase rfc1035/rfc1123 labels separated by '.' with a maximum length of 253 characters
+    # One or more lowercase rfc1035/rfc1123 labels separated by '.' with a
+    # maximum length of 253 characters
     return len(s) <= 253 and all(is_valid_dns_label(p) for p in s.split('.'))
 
 
@@ -52,18 +53,41 @@ def run(argv: List[str]) -> None:
         if args.input is not None:
             f.close()
 
-    k8s_data = {clean_key(secret['key']): secret['value'] for secret in dcos_secrets}
+    k8s_data = {}
+    name_map = {}
+    for secret in dcos_secrets['secrets']:
+        k8s_key = clean_key(secret['key'])
+        if k8s_key in k8s_data:
+            # cleaning has created a duplicate
+            i = 1
+            candidate = k8s_key + str(i)
+            while candidate in k8s_data:
+                i += 1
+                candidate = k8s_key + str(i)
+            k8s_key = candidate
+        k8s_data[k8s_key] = secret['value']
+        dcos_path = '{}/{}'.format(secret['path'], secret['key']).strip('/')
+        name_map[dcos_path] = k8s_key
+
+    k8s_data = {clean_key(secret['key']): secret['value'] for secret in dcos_secrets['secrets']}
     k8s_secret = {
         "apiVersion": "v1",
         "kind": "Secret",
         "metadata": {
             "namespace": args.namespace.lower(),
             "name": args.name.lower(),
+            "labels": {
+                "dcos-migration.d2iq.com/dcos-cluster-id": dcos_secrets['cluster_id'],
+            },
+            "annotations": {
+                # Need to double serialize because annotations must have string values:
+                # https://github.com/kubernetes/kubernetes/issues/12226
+                "dcos-migration.d2iq.com/dcos-secret": json.dumps(name_map),
+            }
         },
         "type": "Opaque",
         "data": k8s_data,
     }
-
     if args.output is None:
         f = sys.stdout
     else:
