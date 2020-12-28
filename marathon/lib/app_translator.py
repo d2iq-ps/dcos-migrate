@@ -114,19 +114,19 @@ def main_container(fields):
 
 
 def translate_container_command(fields):
-    if 'cmd' not in fields:
+    # Marathon either supports args (with a container specified), or cmd. Not both.
+    # Marathon does not have a way to override the entrypoint for a container.
+    # https://github.com/mesosphere/marathon/blob/b5023142bdf8bd75f187df897ab4d70f4fe03b24/src/test/scala/mesosphere/marathon/api/v2/json/AppDefinitionTest.scala#L131-L132
+    if 'cmd' in fields:
+        cmdline = ["/bin/sh", "-c", fields['cmd']]
+
+        # FIXME: Sanitize the cmdline against DCOS-specific stuff!
+        return Translated(update=main_container({'command': cmdline}))
+    elif 'args' in fields:
+        # FIXME: Sanitize the cmdline against DCOS-specific stuff!
+        return Translated(update=main_container({'args': fields['args']}))
+    else:
         return Translated()
-
-    cmdline = [fields['cmd']] + fields.get('args', [])
-
-    # FIXME: This is not the proper way to generate a command
-    # from a shell command line.
-    if len(cmdline) == 1:
-        cmdline = ["/bin/sh", "-c", cmdline[0]]
-
-    # FIXME: Sanitize the cmdline against DCOS-specific stuff!
-    return Translated(update=main_container({'command': cmdline}))
-
 
 RESOURCE_TRANSLATION = {
     'cpus': lambda cpus: ('cpu', cpus),

@@ -4,17 +4,21 @@ import sys
 
 import pytest
 
-def test_sleep():
-    container_defaults = app_translator.Settings(
+def new_settings(image: str = "busybox"):
+    return app_translator.Settings(
         app_translator.ContainerDefaults(
-            image="busybox",
+            image=image,
             working_dir=".",
         ),
         imported_k8s_secret_name = "dummy"
     )
 
-    hello_app = app_translator.load("test/resources/hello.json")[0]
-    result, warnings = app_translator.translate_app(hello_app, container_defaults)
+
+
+def test_happy_path_sleeper():
+    settings = new_settings()
+    hello_app = app_translator.load("test/resources/simple-command-app.json")[0]
+    result, warnings = app_translator.translate_app(hello_app, settings)
 
     assert(result['kind'] == "Deployment")
     assert(result['metadata']['name'] == "sleep")
@@ -29,28 +33,26 @@ def test_sleep():
 
 
 def test_image_in_app_makes_image_default_unnecessary():
-    settings = app_translator.Settings(
-        app_translator.ContainerDefaults(
-            image=None,
-            working_dir=None,
-        ),
-        imported_k8s_secret_name = "dummy"
-    )
-
+    settings = new_settings()
     app = {"id":"app", "container": {"docker": {"image": "busybox"}}}
     result, _ = app_translator.translate_app(app, settings)
     assert result['spec']['template']['spec']['containers'][0]['image'] == "busybox"
 
 
 def test_image_should_be_present_somewhere():
-    settings = app_translator.Settings(
-        app_translator.ContainerDefaults(
-            image=None,
-            working_dir=None,
-        ),
-        imported_k8s_secret_name = "dummy"
-    )
-
+    settings = new_settings(image = None)
     app = {"id":"app", "command": "sleep 300"}
     with pytest.raises(app_translator.AdditionalFlagNeeded, match=".*image.*"):
         app_translator.translate_app(app, settings)
+
+def test_translates_args():
+    settings = new_settings()
+    hello_app = app_translator.load("test/resources/container-args-app.json")[0]
+    result, warnings = app_translator.translate_app(hello_app, settings)
+
+    assert(result['kind'] == "Deployment")
+    assert(result['metadata']['name'] == "args")
+    container = result['spec']['template']['spec']['containers'][0]
+
+    assert(not "command" in container)
+    assert(container['args'] == ["args", "passed", "to", "entrypoint"])
