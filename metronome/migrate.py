@@ -33,6 +33,9 @@ def dnsify(name):
 # FIXME: reuse version from secrets migration. BEWARE: added lstrip(".")!
 _invalid_secret_key = re.compile("[^-._a-zA-Z0-9]")
 
+# as you can't rerun a K8s-`Job` easily, we might generate cronjobs instead of normal jobs to mimick DC/OS's job runs. these are the attributes used for that.
+fake_cron = {"suspend": True, "schedule": "* * * * *"}
+
 
 def clean_key(s: str) -> str:
     # Replace DC/OS folders with dots
@@ -367,9 +370,7 @@ def convert_ucr_to_docker(model):
 ###############################################################################
 
 
-def translate(args):
-    with open(args.path) as f:
-        json_spec = json.load(f)
+def translate(json_spec, args={}):
     artifacts = json_spec["run"].pop("artifacts", None)
     labels = json_spec.pop("labels", None)
     secrets = json_spec["run"].pop("secrets", None)
@@ -401,21 +402,30 @@ def translate(args):
             )
         plain_job["spec"]["template"]["spec"]["containers"][0]["image"] = args.image
 
-    if any(schedule_props) > 0:
+    if args.get("force_cronjob") or any(schedule_props) > 0:
         cron_job = {
             "apiVersion": "batch/v1beta1",
             "kind": "CronJob",
-            "spec": {"jobTemplate": plain_job},
+            "spec": {
+                "jobTemplate": plain_job,
+                **({} if any(schedule_props) else fake_cron),
+            },
         }
 
         for k, v in schedule_props:
             cron_job = translate_schedule_prop(k, v, json_spec, cron_job)
 
-        print(yaml.safe_dump(cron_job))
-
+        return yaml.safe_dump(cron_job)
     else:
-        job = deep_merge(plain_job, {"apiVersion": "batch/v1", "kind": "Job"})
-        print(yaml.safe_dump(job))
+        return yaml.safe_dump(
+            deep_merge(plain_job, {"apiVersion": "batch/v1", "kind": "Job"})
+        )
+
+
+def migrate(args):
+    with open(args.path) as f:
+        json_spec = json.load(f)
+    print(translate(json_spec, args))
 
 
 def download():
@@ -451,10 +461,15 @@ def main():
         help="Name of the K8s secret into which the DCOS secrets have been imported",
     )
     translate_cmd.add_argument(
+        "--force-cronjob",
+        type=bool,
+        help="Generate a CronJob, even if the source spec has no schedule specified. This might be helpful in the cases where you want to manually trigger JobRuns as you can't rerun a K8s-Job.",
+    )
+    translate_cmd.add_argument(
         "--working-dir", help="Needs to be set in case your Job used 'artifacts'"
     )
 
-    translate_cmd.set_defaults(func=lambda args: translate(args))
+    translate_cmd.set_defaults(func=lambda args: migrate(args))
 
     download_cmd = subparsers.add_parser(
         "download",

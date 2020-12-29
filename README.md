@@ -12,6 +12,9 @@ To set up an environment to run those tools, you might want to use something lik
 ```
 docker build -t dcos-migrate .
 docker run -it --rm -v "$(echo $PWD):/work" dcos-migrate
+
+# e.g. run a test:
+pipenv run pytest metronome/metronome_test.py
 ```
 
 ## Testing
