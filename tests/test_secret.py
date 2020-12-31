@@ -161,11 +161,8 @@ class TestSecrets:
             dcos_cluster_id = backup.get_dcos_cluster_id(cli.path)
             url = backup.get_dcos_url(cli.path)
             token = backup.get_dcos_token(cli.path)
-            trust = backup.get_dcos_truststore(url)
-            truststore = tmp_path / 'trust'
-            truststore.write_text(trust)
 
-            s = backup.DCOSSecretsService(url, token, truststore)
+            s = backup.DCOSSecretsService(url, token, False)
 
             # `list` returns all keys below the folder
             response = s.list('')
@@ -273,7 +270,7 @@ class TestSecrets:
             # Test backup of DC/OS secrets
 
             dcosfile1 = tmp_path / 'output-1'
-            backup.run(['--target-file', str(dcosfile1)])
+            backup.run(['--no-verify', '--output', str(dcosfile1)])
             assert stat.S_IMODE(dcosfile1.stat().st_mode) == 0o600
             with dcosfile1.open() as f:
                 response = json.load(f)
@@ -281,7 +278,7 @@ class TestSecrets:
             assert keys == {'key1', 'folder/key2', 'folder/key3', 'folder/sub', 'folder/sub/key4'}
 
             dcosfile2 = tmp_path / 'output-2'
-            backup.run(['--path', 'folder', '--target-file', str(dcosfile2)])
+            backup.run(['--no-verify', '--path', 'folder', '--output', str(dcosfile2)])
             assert stat.S_IMODE(dcosfile2.stat().st_mode) == 0o600
             with dcosfile2.open() as f:
                 response = json.load(f)
@@ -291,15 +288,40 @@ class TestSecrets:
             # When backing up a path that is a secret and a folder, only the secrets under the
             # folder are exported, not the secret at the named path.
             dcosfile3 = tmp_path / 'output-3'
-            backup.run(['--path', 'folder/sub', '--target-file', str(dcosfile3)])
+            backup.run(['--no-verify', '--path', 'folder/sub', '--output', str(dcosfile3)])
             assert stat.S_IMODE(dcosfile3.stat().st_mode) == 0o600
             with dcosfile3.open() as f:
                 response = json.load(f)
             keys = set(s['key'] for s in response['secrets'])
             assert keys == {'key4'}
 
+            # The command will not work without a CA flag as the test DC/OS cluster CA is not in the
+            # system CA bundle.
+            with pytest.raises(requests.exceptions.SSLError):
+                backup.run(
+                    [
+                        '--path', 'folder/sub/key4',
+                        '--output', str(dcosfile3)
+                    ]
+                )
+
+            # Download the CA certificate for the cluster to verify subsequent connections. Since we
+            # don't yet have the CA certificate, this request cannot be verified (and hence is
+            # insecure).
+            r = requests.get(url + '/ca/dcos-ca.crt', verify=False)
+            r.raise_for_status()
+            cert = r.content
+            ca_path = tmp_path / 'ca_cert'
+            ca_path.write_bytes(cert)
+
             dcosfile4 = tmp_path / 'output-4'
-            backup.run(['--path', 'folder/sub/key4', '--target-file', str(dcosfile4)])
+            backup.run(
+                [
+                    '--ca-file', str(ca_path),
+                    '--path', 'folder/sub/key4',
+                    '--output', str(dcosfile4)
+                ]
+            )
             assert stat.S_IMODE(dcosfile4.stat().st_mode) == 0o600
             with dcosfile4.open() as f:
                 response = json.load(f)['secrets']
