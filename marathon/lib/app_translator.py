@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import os.path
 
 from collections import namedtuple
@@ -227,6 +228,127 @@ def translate_multitenancy(fields):
     })
 
 
+class InvalidAppDefinition(Exception):
+    pass
+
+
+def get_network_probe_builder(get_port_by_index):
+    def build_network_probe(fields):
+        protocol = fields.pop('protocol')
+        port = fields.pop('port', None)
+        index = fields.pop('portIndex', 0)
+        path = fields.pop('path', '/')
+
+        warnings = [] if not fields else \
+            ['Non-translatable health check fields: {}'.format(try_oneline_dump(fields))]
+
+        use_host_port = protocol in ['TCP', 'HTTP', 'HTTPS']
+        port = get_port_by_index(index, use_host_port) if port is None else port
+
+        # TODO (asekretenko): The app translator should choose a value for each port==0
+        # once, and ensure that the same value is used for the same port
+        # by different parts of the generated manifest.
+        if port == 0:
+            warnings.append(
+                "The app is using port 0 (auto-assigned by Marathon) in a health check."
+                " Please make sure that the generated K8s probe is using a correct port number.")
+
+        if protocol in ['MESOS_TCP', 'TCP']:
+            return Translated({'tcpSocket': {'port': port}}, warnings)
+
+        if protocol in ['MESOS_HTTP', 'HTTP', 'MESOS_HTTPS', 'HTTPS']:
+            scheme = 'HTTPS' if protocol in ['MESOS_HTTPS', 'HTTPS'] else 'HTTP'
+            return Translated({'httpGet': {'port': port, 'scheme': scheme, 'path': path}}, warnings)
+
+        raise InvalidAppDefinition("Invalid `protocol` in a health check: {}".format(protocol))
+
+    return build_network_probe
+
+
+def rename(name):
+    return lambda _: Translated({name: _})
+
+
+def health_check_to_probe(check, get_port_by_index, error_location):
+    flattened_check = flatten(check)
+
+    mapping = {
+        'gracePeriodSeconds': rename('initialDelaySeconds'),
+        'intervalSeconds': rename('periodSeconds'),
+        'maxConsecutiveFailures': rename('failureThreshold'),
+        'timeoutSeconds': rename('timeoutSeconds'),
+        'delaySeconds': skip_if_equals(15),
+        'ipProtocol': skip_if_equals("IPv4"),
+        'ignoreHttp1xx': skip_if_equals(False),
+        'protocol': skip_quietly,
+    }
+
+    if check['protocol'] == 'COMMAND':
+        mapping['command.value'] = lambda command: Translated({'command': ["/bin/sh", "-c", command]})
+    else:
+        mapping[('protocol', 'port', 'portIndex', 'path')] = get_network_probe_builder(get_port_by_index)
+
+    probe, warnings = apply_mapping(mapping, flattened_check, error_location)
+    probe.setdefault('initialDelaySeconds', 300)
+    probe.setdefault('periodSeconds', 60)
+    probe.setdefault('timeoutSeconds', 20)
+
+    if check['protocol'] in ['TCP', 'HTTP', 'HTTPS']:
+        warnings.append(
+            "The app is using a deprecated Marathon-level health check:\n" +
+            try_oneline_dump(check) +
+            "\nPlease check that the K8s probe is using the correct port.")
+
+    return probe, warnings
+
+
+def translate_health_checks(fields, error_location):
+    def get_port_by_index(index, use_host_port=False):
+        port_mappings = fields.get('container', {}).get('portMappings')
+        port_definitions = fields.get('portDefinitions')
+        if port_mappings is None == port_definitions is None:
+            raise InvalidAppDefinition("Cannot get port by index as both portDefinitions and container.portMappings are set")
+
+        if port_definitions is not None:
+            try:
+                port_data = port_definitions[index]
+            except IndexError:
+                raise InvalidAppDefinition("Port index {} used in health check missing from `portDefinitions`".format(index))
+
+            try:
+                return port_data['port']
+            except KeyError:
+                raise InvalidAppDefinition("`portDefinitions` contain no 'port' at index {} used in health check".format(index))
+
+        try:
+            port_data = port_mappings[index]
+        except IndexError:
+            raise InvalidAppDefinition("Port index {} used in health check missing from `container.portMappings`".format(port_index))
+
+        key = 'hostPort' if use_host_port else 'containerPort'
+        try:
+            return port_data[key]
+        except KeyError:
+            raise InvalidAppDefinition("`container.portMappings` contain no '{}' at index {} used in health check".format(key, index))
+
+    health_checks = fields.get('healthChecks', [])
+    if len(health_checks) < 1:
+        return Translated()
+
+    livenessProbe, warnings = health_check_to_probe(health_checks[0], get_port_by_index, error_location)
+
+    excess_health_checks = health_checks[1:]
+    if excess_health_checks:
+        warnings.append(
+            'Only the first app health check is converted into a liveness probe.\n'
+            'Dropped health checks:\n{}'.format(
+                try_oneline_dump(excess_health_checks)))
+
+    return Translated(
+        update=main_container({'livenessProbe': livenessProbe}),
+        warnings=warnings
+    )
+
 
 def skip_quietly(_):
     return Translated()
@@ -276,7 +398,8 @@ def generate_root_mapping(settings: Settings, error_location):
 
         'executor': skip_if_equals(""),
 
-        'healthChecks': skip_if_equals({}),  # translate_health_checks,
+        ('healthChecks', 'container', 'portDefinitions'):
+            lambda fields: translate_health_checks(fields, error_location),
 
         ('acceptedResourceRoles', 'id', 'role'): translate_multitenancy,
 
@@ -522,6 +645,10 @@ def translate_app(app: dict, container_defaults: ContainerDefaults):
 
     mapping = generate_root_mapping(container_defaults, error_location)
 
-    definition, warnings = apply_mapping(mapping, app, error_location)
+    try:
+        definition, warnings = apply_mapping(mapping, app, error_location)
+    except InvalidAppDefinition as err:
+        raise InvalidAppDefinition('{} at {}'.format(err, error_location))
+
     definition.update({'apiVersion': 'apps/v1', 'kind': 'Deployment'})
     return definition, warnings
