@@ -5,21 +5,18 @@ import os
 import requests
 import subprocess
 import sys
-import tempfile
 import urllib
-import urllib3
-import warnings
-from typing import Dict, List
+from typing import Dict, List, Union
 
 DCOS = os.getenv("DCOS_CLI", "dcos")
 
 
 class DCOSSecretsService:
 
-    def __init__(self, url: str, token: str, trust: str):
+    def __init__(self, url: str, token: str, verify: Union[bool, str]):
         self.url = url + '/secrets/v1'
         self.auth = 'token=' + token
-        self.trust = trust
+        self.verify = verify
         self.store = 'default'
 
     def list(self, path: str = '') -> List[str]:
@@ -28,7 +25,7 @@ class DCOSSecretsService:
                 store=urllib.parse.quote(self.store), path=urllib.parse.quote(path)
             ),
             headers={'Authorization': self.auth},
-            verify=self.trust,
+            verify=self.verify,
         )
         r.raise_for_status()
         return r.json()['array']
@@ -52,7 +49,7 @@ class DCOSSecretsService:
         r = requests.get(
             url,
             headers={'Authorization': self.auth, 'Accept': '*/*'},
-            verify=self.trust,
+            verify=self.verify,
         )
         r.raise_for_status()
         content_type = r.headers['Content-Type']
@@ -80,7 +77,7 @@ class DCOSSecretsService:
         return response
 
 
-def get_dcos_cluster_id(dcos_cli) -> str:
+def get_dcos_cluster_id(dcos_cli: str) -> str:
     p = subprocess.run(
         [dcos_cli, 'cluster', 'list', '--attached', '--json'],
         stdout=subprocess.PIPE,
@@ -89,17 +86,6 @@ def get_dcos_cluster_id(dcos_cli) -> str:
     )
     j = json.loads(p.stdout)
     return j[0]['cluster_id']
-
-
-def get_dcos_truststore(dcos_url: str) -> str:
-    # Download the CA certificate for the cluster to verify subsequent connections. Since we don't
-    # yet have the CA certificate, this request cannot be verified (and hence is insecure).
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
-        r = requests.get(dcos_url + '/ca/dcos-ca.crt', verify=False)
-    r.raise_for_status()
-    cert = r.text
-    return cert
 
 
 def get_dcos_token(dcos_cli: str) -> str:
@@ -126,8 +112,20 @@ def get_dcos_url(dcos_cli: str) -> str:
 
 def run(argv: List[str]) -> None:
     parser = argparse.ArgumentParser(description='Backup secrets from DC/OS secrets service.')
-    parser.add_argument('--path', default='', help='secrets namespace to export')
-    parser.add_argument('--target-file', default=None, help="path of the target file")
+    parser.add_argument(
+        '--path', default='', help='DC/OS secrets namespace to export (default: all secrets)'
+    )
+    parser.add_argument(
+        '--output', default=None, help='DC/OS secrets output file (default: stdout)'
+    )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '--no-verify', dest='verify', default=True, action='store_false',
+        help='do not verify connections to DC/OS (insecure)'
+    )
+    group.add_argument(
+        '--ca-file', dest='verify', help='specify a CA bundle file to verify connections to DC/OS'
+    )
 
     args = parser.parse_args(argv)
     path = args.path
@@ -135,36 +133,32 @@ def run(argv: List[str]) -> None:
     cluster_id = get_dcos_cluster_id(DCOS)
     url = get_dcos_url(DCOS)
     token = get_dcos_token(DCOS)
-    trust = get_dcos_truststore(url)
 
-    with tempfile.NamedTemporaryFile('w+', encoding='utf-8') as certf:
-        certf.write(trust)
-        certf.flush()
-        s = DCOSSecretsService(url, token, certf.name)
-        secrets = []
-        keys = s.list(path)
-        if keys:
-            # Path is a folder containing secrets
-            for key in s.list(path):
-                secrets.append(s.get(path, key))
-        else:
-            # Expect path to name a specific secret
-            secrets.append(s.get(path, ''))
+    s = DCOSSecretsService(url, token, args.verify)
+    secrets = []
+    keys = s.list(path)
+    if keys:
+        # Path is a folder containing secrets
+        for key in s.list(path):
+            secrets.append(s.get(path, key))
+    else:
+        # Expect path to name a specific secret
+        secrets.append(s.get(path, ''))
 
-        output = {
-            'cluster_id': cluster_id,
-            'secrets': secrets
-        }
-        if args.target_file is None:
-            f = sys.stdout
-        else:
-            # To protect secrets open with read/write permissions only for owner
-            f = os.fdopen(os.open(args.target_file, os.O_WRONLY | os.O_CREAT, 0o600), 'w')
-        try:
-            json.dump(output, f, indent=2, sort_keys=True)
-        finally:
-            if args.target_file is not None:
-                f.close()
+    output = {
+        'cluster_id': cluster_id,
+        'secrets': secrets
+    }
+    if args.output is None:
+        f = sys.stdout
+    else:
+        # To protect secrets open with read/write permissions only for owner
+        f = os.fdopen(os.open(args.output, os.O_WRONLY | os.O_CREAT, 0o600), 'w')
+    try:
+        json.dump(output, f, indent=2, sort_keys=True)
+    finally:
+        if args.output is not None:
+            f.close()
 
 
 def main() -> None:

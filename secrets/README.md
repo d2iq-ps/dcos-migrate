@@ -20,15 +20,17 @@ The command to export secrets from DC/OS to a file:
 
 ```
 ➜ python3 ./secrets/backup.py --help
-usage: backup.py [-h] [--path PATH] [--target-file TARGET_FILE]
+usage: backup.py [-h] [--path PATH] [--output OUTPUT]
+                 [--no-verify | --ca-file VERIFY]
 
 Backup secrets from DC/OS secrets service.
 
 optional arguments:
-  -h, --help            show this help message and exit
-  --path PATH           secrets namespace to export
-  --target-file TARGET_FILE
-                        path of the target file
+  -h, --help        show this help message and exit
+  --path PATH       DC/OS secrets namespace to export (default: all secrets)
+  --output OUTPUT   DC/OS secrets output file (default: stdout)
+  --no-verify       do not verify connections to DC/OS (insecure)
+  --ca-file VERIFY  specify a CA bundle file to verify connections to DC/OS
 ``` 
 
 If `path` is specified, all secrets under that path are exported. If `path` is not specified, all secrets are exported.
