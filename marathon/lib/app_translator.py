@@ -137,16 +137,29 @@ RESOURCE_TRANSLATION = {
 }
 
 
-def get_resources_translator(is_limits=False):
-    def translator(resources):
-        translated = {k: v for k, v in (RESOURCE_TRANSLATION[key](
-            value) for key, value in resources.items() if value != 0)}
+def translate_resources(fields):
+    app_requests = fields.copy()
+    app_limits = app_requests.pop('resourceLimits', {})
 
-        return Translated(update=main_container({'resources': {
-                    'limits' if is_limits else 'requests': translated
-                }}))
+    def iter_requests():
+        for key, value in app_requests.items():
+            if value != 0 :
+                yield RESOURCE_TRANSLATION[key](value)
 
-    return translator
+    def iter_limits():
+        for key in app_requests.keys() | app_limits.keys():
+            if key in app_limits:
+                limit = app_limits[key]
+                if limit != "unlimited":
+                    yield RESOURCE_TRANSLATION[key](limit)
+            else:
+                limit_from_requests = app_requests[key]
+                if limit_from_requests != 0:
+                    yield RESOURCE_TRANSLATION[key](limit_from_requests)
+
+    resources = {'requests': dict(iter_requests()), 'limits': dict(iter_limits())}
+    update = main_container({'resources': {k: v for k, v in resources.items() if v}})
+    return Translated(update)
 
 
 class MissingSecretSource(Exception):
@@ -387,7 +400,7 @@ def generate_root_mapping(settings: Settings, error_location):
         ('container', 'fetch'):
             get_container_translator(settings.container_defaults, error_location),
 
-        ('cpus', 'mem', 'disk', 'gpus'): get_resources_translator(is_limits=False),
+        ('cpus', 'mem', 'disk', 'gpus', 'resourceLimits'): translate_resources,
 
         'dependencies': skip_if_equals([]),
 
