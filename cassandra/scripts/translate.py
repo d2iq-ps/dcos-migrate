@@ -1,3 +1,4 @@
+import math
 import os
 import json
 import logging as log
@@ -23,6 +24,56 @@ OPTIONAL_ENVS = [
     "AUTHENTICATION_CUSTOM_YAML_BLOCK"
 ]
 
+# KUBERNETES CLI
+KUBECTL = os.getenv("KUBECTL", "kubectl")
+
+WARNING = """
+WARNING: ALL THE PARAMETERS ARE GENERATED AS PER THE DCOS VERSION OF THE SERVICE, IT MIGHT NOT BE THE BEST FOR K8s.
+SO BEFORE INSTALLING THE SERVICE PLEASE OPEN A TARGET FILE ({}) AND MODIFY VALUES AS PER THE AVAILABILITY ON THE K8s CLUSTER.
+SPECIALLY VALUES OF THESE FIELDS SHOULD BE ADJUSTED AS PER THE CLUSTER:
+NODE_COUNT
+NODE_CPU_MC
+NODE_CPU_LIMIT_MC
+NODE_MEM_MIB
+NODE_MEM_LIMIT_MIB
+NODE_DISK_SIZE_GIB
+NODE_TOPOLOGY
+EXTERNAL_SEED_NODES
+OTC_COALESCING_STRATEGY - value should be one of these [disabled fixed movingaverage timehorizon]
+ENDPOINT_SNITCH - if GossipingPropertyFileSnitch not working, use SimpleSnitch
+"""
+
+
+def print_instructions(namespace: str, instance: str, target_file: str, version: str):
+    separator = "--------------------------------------------------"
+
+    KUDO_CMD = '''
+{kubectl} kudo install \\
+    --namespace {namespace} \\
+    --instance {instance} \\
+    --parameter-file {target_file} \\
+    --operator-version {version} \\
+    cassandra
+'''
+    KUDO_STATUS_CMD = """
+{kubectl} kudo plan status \\
+    --namespace {namespace} \\
+    --instance {instance}
+"""
+
+    print(separator)
+    print("Run the following command to install Cassandra on K8s: {}".format(
+        KUDO_CMD.format(kubectl=KUBECTL, namespace=namespace,
+          instance=instance, target_file=target_file, version=version)))
+    print(separator)
+    print(WARNING.format(target_file))
+    print(separator)
+    print("Run the following command to check the status: {}".format(
+        KUDO_STATUS_CMD.format(kubectl=KUBECTL, namespace=namespace, instance=instance)))
+    print(separator)
+    print("Make sure plan shows COMPELTE, before proceeding further.")
+    print(separator)
+
 
 def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
     log.info(f'Using "{src_file}" file to migrate to kubernetes configuration at "{target_file}"')
@@ -44,7 +95,13 @@ def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
         tmpl_lines = f.readlines()
     
     # Convert Disk Size from MB to GiB
-    src_envs["CASSANDRA_DISK_GB"] = str(int(src_envs["CASSANDRA_DISK_MB"])/1024)
+    src_envs["CASSANDRA_DISK_GB"] = str(math.ceil(float(src_envs["CASSANDRA_DISK_MB"])/1024))
+
+    # Round of the value of CPU
+    src_envs["CASSANDRA_CPUS"] = str(math.ceil(float(src_envs["CASSANDRA_CPUS"]) * 1000))
+
+    # Make sure value is in lowercase
+    src_envs["CASSANDRA_OTC_COALESCING_STRATEGY"] = src_envs["CASSANDRA_OTC_COALESCING_STRATEGY"].lower()
 
     # Convert Cassandra Rack-awareness to K8s Cassandra Node Topology
     if src_envs["PLACEMENT_REFERENCED_ZONE"] == "true":
@@ -61,5 +118,5 @@ def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
             tmpl_key, tmpl_value = tmpl.split(':')
             tmpl_value = tmpl_value.strip()
             if tmpl_value in src_envs and len(src_envs[tmpl_value]) > 0:
-                f.write(tmpl_key + ": " + src_envs[tmpl_value] + '\n')
+                f.write(tmpl_key + ": \"" + src_envs[tmpl_value] + '"\n')
     return True
