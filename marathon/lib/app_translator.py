@@ -397,7 +397,7 @@ def generate_root_mapping(settings: Settings, error_location):
 
         'constraints': skip_if_equals([]),
 
-        ('container', 'fetch'):
+        ('container',):
             get_container_translator(settings.container_defaults, error_location),
 
         ('cpus', 'mem', 'disk', 'gpus', 'resourceLimits'): translate_resources,
@@ -410,6 +410,8 @@ def generate_root_mapping(settings: Settings, error_location):
             lambda fields: translate_env(fields, settings.imported_k8s_secret_name, error_location),
 
         'executor': skip_if_equals(""),
+
+        'fetch': lambda fetches: translate_fetch(fetches, settings.container_defaults, error_location),
 
         ('healthChecks', 'container', 'portDefinitions'):
             lambda fields: translate_health_checks(fields, error_location),
@@ -465,8 +467,13 @@ def generate_fetch_command(uri: str, allow_extract: bool, executable: bool):
     return fmt.format(fn=filename, uri=uri, postprocess=postprocess)
 
 
-def translate_fetch(fetches, artifacts_volume_name):
-    warnings = []
+def translate_fetch(fetches, defaults: ContainerDefaults, error_location):
+    if not defaults.working_dir:
+        raise AdditionalFlagNeeded(
+            '{} is using "fetch"; please specify non-empty `--container-working-dir` and run again'.format(error_location)
+        )
+
+    warnings = ['This app uses "fetch"; consider using a container image instead.']
 
     def iter_command():
         yield 'set -x'
@@ -500,64 +507,100 @@ def translate_fetch(fetches, artifacts_volume_name):
                 "image": "bash:5.0",
                 "command": ['bash', '-c', '\n'.join(iter_command())],
                 "volumeMounts": [{
-                    "name": artifacts_volume_name,
+                    "name": "fetch-artifacts",
                     "mountPath": "/fetch_artifacts"
                 }],
                 "workingDir": "/fetch_artifacts",
             }],
-            "volumes": [{"name": artifacts_volume_name, "emptyDir": {}}]
+            "containers": [{
+                "volumeMounts": ListExtension([{
+                    "name": "fetch-artifacts",
+                    "mountPath": defaults.working_dir,
+                }]),
+            }],
+            "volumes": ListExtension([{"name": "fetch-artifacts", "emptyDir": {}}])
         }),
         warnings=warnings,
     )
 
 
 def get_container_translator(defaults: ContainerDefaults, error_location):
+    def translate_image(image_fields):
+        if 'docker.image' in image_fields:
+            return Translated(main_container({'image': image_fields['docker.image']}))
+
+        if not defaults.image:
+            raise AdditionalFlagNeeded(
+                '{} has no image; please specify non-empty `--default-image` and run again'.format(error_location)
+            )
+        container_update = {'image': defaults.image}
+
+        # TODO (asekretenko): This sets 'workingDir' only if 'docker.image' is
+        # not specified. Figure out how we want to treat a combination of
+        # a 'fetch' with a non-default 'docker.image'.
+        if defaults.working_dir:
+            container_update['workingDir'] = defaults.working_dir
+        return Translated(main_container(container_update))
+
+    def translate_volume(volume, name) -> Translated:
+        def untranslatable():
+            return Translated(warnings=["Cannot translate a volume: {}".format(try_oneline_dump(volume))])
+
+        fields = volume.copy()
+        try:
+            container_path = fields.pop('containerPath')
+            host_path = fields.pop('hostPath')
+            mode = fields.pop('mode')
+        except KeyError:
+            return untranslatable()
+
+        if fields:
+            return untranslatable()
+
+        if not host_path.startswith('/'):
+            return untranslatable()
+
+        if mode not in ("RO", "RW"):
+            raise InvalidAppDefinition("Invalid mode {} in {}".format(mode, error_location))
+
+        mount = Translated(main_container({"volumeMounts": ListExtension([{
+            "name": name,
+            "mountPath": container_path,
+            "readOnly": mode == "RO",
+        }])}))
+
+        pod_volume = Translated(pod_spec_update({"volumes": ListExtension([{
+            "name": name,
+            "hostPath": {"path": host_path}
+        }])}))
+
+        return mount.merged_with(pod_volume)
+
+    def translate_volumes(volumes):
+        result = Translated()
+        for n, volume in enumerate(volumes):
+            translated = translate_volume(volume, 'volume-{}'.format(n))
+            result = result.merged_with(translated)
+        return result
+
     def translate_container(fields):
-        container, warnings = apply_mapping(
+        update, warnings = apply_mapping(
             mapping={
-                "docker.forcePullImage": lambda _: Translated({'imagePullPolicy': "Always" if _ else "IfNotPresent"}),
-                "docker.image": lambda _: Translated({'image': _}),
+                "docker.forcePullImage": lambda _: Translated(main_container({'imagePullPolicy': "Always" if _ else "IfNotPresent"})),
+                ("docker.image", ): translate_image,
                 "docker.parameters": skip_if_equals([]),
                 "docker.privileged": skip_if_equals(False),
                 "docker.pullConfig.secret": skip_if_equals({}),
                 "linuxInfo": skip_if_equals({}),
                 "portMappings": skip_if_equals({}),
-                "volumes": skip_if_equals([]),
+                "volumes": translate_volumes,
                 "type": skip_quietly,
             },
             data=flatten(fields.get('container', {})),
             error_location=error_location + ", container"
         )
 
-        if 'image' not in container:
-            if defaults.image:
-                container['image'] = defaults.image
-            else:
-                raise AdditionalFlagNeeded(
-                    '{} has no image; please specify non-empty `--default-image` and run again'.format(error_location)
-                )
-
-            if defaults.working_dir:
-                container['workingDir'] = defaults.working_dir
-
-        fetch = Translated()
-        if fields.get('fetch'):
-            if not defaults.working_dir:
-                raise AdditionalFlagNeeded(
-                    '{} is using "fetch"; please specify non-empty `--container-working-dir` and run again'.format(error_location)
-                )
-
-            warnings.append('This app uses "fetch"; consider using a container image instead.')
-
-            # NOTE: volumeMounts might already be non-empty after translating "volumes"
-            container.setdefault("volumeMounts", []).append({
-                "name": 'fetch-artifacts',
-                "mountPath": defaults.working_dir
-            })
-
-            fetch = translate_fetch(fields['fetch'], 'fetch-artifacts')
-
-        return Translated(update=main_container(container), warnings=warnings).merged_with(fetch)
+        return Translated(update, warnings)
 
     return translate_container
 
@@ -600,6 +643,12 @@ def load(path: str):
     return [apps]
 
 
+# This is used in objects passed into `deep_merge()` to apply an alternative
+# way of merging lists: the list on the left is extended with items from
+# the ListExtension on the right.
+ListExtension = namedtuple('ListExtension', ['items'])
+
+
 class UpdateConflict(Exception):
     pass
 
@@ -629,6 +678,24 @@ def deep_merge(first, second, debug_prefix=''):
     Traceback (most recent call last):
         ...
     UpdateConflict: Conflicting values for .foo: 1 and 2
+
+    >>> deep_merge([1], ListExtension([2]))
+    [1, 2]
+
+    >>> deep_merge(ListExtension([1, 2]), [3])
+    [3, 1, 2]
+
+    >>> result = deep_merge(ListExtension([1]), ListExtension([2]))
+    >>> result == ListExtension([1, 2])
+    True
+
+    >>> result = deep_merge({"foo": [1]}, {"foo": ListExtension([2])})
+    >>> result == {"foo": [1, 2]}
+    True
+
+    >>> result = deep_merge({"foo": ListExtension([1])}, {"bar": [2]})
+    >>> result == {"foo": ListExtension([1]), "bar": [2]}
+    True
     """
     if all(isinstance(_, dict) for _ in (first, second)):
         def iter_items():
@@ -646,11 +713,31 @@ def deep_merge(first, second, debug_prefix=''):
         return [deep_merge(first[n], second[n], '{}[{}]'.format(debug_prefix, n)) for n in range(min_len)] \
             + first[min_len:] + second[min_len:]
 
+    if any(isinstance(_, ListExtension) for _ in (first, second)):
+        base, extension = (first, second) if isinstance(second, ListExtension) else (second, first)
+        if isinstance(base, ListExtension):
+            return ListExtension(base.items + extension.items)
+        if isinstance(base, list):
+            return base + extension.items
+
     if first == second:
         return first
 
     raise UpdateConflict(
         'Conflicting values for {}: {} and {}'.format(debug_prefix, first, second))
+
+
+def finalize_unmerged_list_extensions(merged):
+    if isinstance(merged, ListExtension):
+        merged = merged.items
+
+    if isinstance(merged, list):
+        return [finalize_unmerged_list_extensions(item) for item in merged]
+
+    if isinstance(merged, dict):
+        return {key: finalize_unmerged_list_extensions(value) for key, value in merged.items()}
+
+    return merged
 
 
 def translate_app(app: dict, container_defaults: ContainerDefaults):
@@ -662,6 +749,8 @@ def translate_app(app: dict, container_defaults: ContainerDefaults):
         definition, warnings = apply_mapping(mapping, app, error_location)
     except InvalidAppDefinition as err:
         raise InvalidAppDefinition('{} at {}'.format(err, error_location))
+
+    definition = finalize_unmerged_list_extensions(definition)
 
     definition.update({'apiVersion': 'apps/v1', 'kind': 'Deployment'})
     return definition, warnings
