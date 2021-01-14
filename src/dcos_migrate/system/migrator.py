@@ -18,7 +18,7 @@ class Migrator(object):
             self.object = backup.data
         self.backup_list = backup_list
         self.manifest_list = manifest_list
-        self.manifest = Manifest()
+        self.manifest = None
 
         self.translate = {}
 
