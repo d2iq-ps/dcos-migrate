@@ -8,8 +8,6 @@ import sys
 import urllib
 from typing import Dict, List, Union
 
-DCOS = os.getenv("DCOS_CLI", "dcos")
-
 
 class DCOSSecretsService:
 
@@ -84,7 +82,7 @@ def get_dcos_cluster_id(dcos_cli: str) -> str:
         timeout=10 * 60,
         check=True,
     )
-    j = json.loads(p.stdout)
+    j = json.loads(p.stdout.decode('utf-8'))
     return j[0]['cluster_id']
 
 
@@ -94,9 +92,8 @@ def get_dcos_token(dcos_cli: str) -> str:
         stdout=subprocess.PIPE,
         timeout=10 * 60,
         check=True,
-        encoding='ascii',
     )
-    return p.stdout.strip()
+    return p.stdout.decode('ascii').strip()
 
 
 def get_dcos_url(dcos_cli: str) -> str:
@@ -105,9 +102,8 @@ def get_dcos_url(dcos_cli: str) -> str:
         stdout=subprocess.PIPE,
         timeout=10 * 60,
         check=True,
-        encoding='ascii',
     )
-    return p.stdout.strip().rstrip('/')
+    return p.stdout.decode('ascii').strip().rstrip('/')
 
 
 def run(argv: List[str]) -> None:
@@ -118,6 +114,10 @@ def run(argv: List[str]) -> None:
     parser.add_argument(
         '--output', default=None, help='DC/OS secrets output file (default: stdout)'
     )
+    parser.add_argument(
+        '--dcos-cli', default=None, help='DC/OS CLI (default: dcos)'
+    )
+
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         '--no-verify', dest='verify', default=True, action='store_false',
@@ -129,10 +129,13 @@ def run(argv: List[str]) -> None:
 
     args = parser.parse_args(argv)
     path = args.path
+    dcos_cli = args.dcos_cli
+    if dcos_cli is None:
+        dcos_cli = os.getenv("DCOS_CLI", 'dcos')
 
-    cluster_id = get_dcos_cluster_id(DCOS)
-    url = get_dcos_url(DCOS)
-    token = get_dcos_token(DCOS)
+    cluster_id = get_dcos_cluster_id(dcos_cli)
+    url = get_dcos_url(dcos_cli)
+    token = get_dcos_token(dcos_cli)
 
     s = DCOSSecretsService(url, token, args.verify)
     secrets = []
