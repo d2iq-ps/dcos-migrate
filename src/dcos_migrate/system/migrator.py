@@ -26,14 +26,14 @@ class Migrator(object):
         """Returns True if self.object is what we expect"""
         return True
 
-    def clean_key(s: str) -> str:
+    def clean_key(self, s: str) -> str:
         # Replace DC/OS folders with dots
         s = s.replace("/", ".")
         # Replace other invalid characters with `_`
         # `folder/sec!ret` becomes `folder.sec_ret`
         return self._invalid_secret_key.sub("_", s).lstrip(".")
 
-    def dnsify(name):
+    def dnsify(self, name):
         new_name = re.sub("[^a-z0-9-]+", "-", name.lower())
         if not name == new_name:
             logging.info(
@@ -48,6 +48,10 @@ class Migrator(object):
         for k, v in self.translate.items():
             expr = parse(k)
             for match in expr.find(self.object):
-                v(match.full_path, match.value)
+                v(match.path, match.value, match.full_path)
 
         return self.manifest
+
+    def noEquivalent(self, key, value, full_path):
+        logging.warning("No equivalent availbale for {full_path} with value {value}".format(
+            full_path=full_path, value=value))

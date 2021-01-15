@@ -1,11 +1,13 @@
 from dcos_migrate.plugins.plugin import MigratePlugin
 from dcos_migrate.plugins.cluster import ClusterPlugin
 from dcos_migrate.plugins.secret import SecretPlugin
-from dcos_migrate.system import DCOSClient, BackupList, Backup
+from dcos_migrate.system import DCOSClient, BackupList, Backup, ManifestList
+
+from .migrator import MetronomeMigrator
 
 
 class MetronomePlugin(MigratePlugin):
-    """docstring for MarathonPlugin."""
+    """docstring for MetronomePlugin."""
 
     plugin_name = "metronome"
     depends_migrate = [ClusterPlugin.plugin_name, SecretPlugin.plugin_name]
@@ -26,3 +28,15 @@ class MetronomePlugin(MigratePlugin):
         return Backup(pluginName=self.plugin_name,
                       backupName=Backup.renderBackupName(job['id']),
                       data=job)
+
+    def migrate(self, backupList: BackupList, manifestList: ManifestList, **kwargs) -> ManifestList:
+        ml = ManifestList()
+
+        for b in backupList.backups(pluginName=self.plugin_name):
+            mig = MetronomeMigrator(backup=b,
+                                    backup_list=backupList,
+                                    manifest_list=manifestList)
+
+            manifest = mig.migrate()
+            if manifest:
+                ml.append(manifest)

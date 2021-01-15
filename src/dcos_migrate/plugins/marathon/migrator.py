@@ -26,14 +26,14 @@ class MarathonMigrator(Migrator):
         id = id.replace('_', '-')
         return '.'.join(reversed(list(filter(None, id.split('/')))))
 
-    def container_portmappings(self, key, value={}):
+    def container_portmappings(self, key, value, full_path):
         p = 0
         if "port" in value and int(value["port"]) == 0:
             p = randrange(1024, 65535)
 
         self.get_deployment()
 
-    def translate_id(self, key, value):
+    def translate_id(self, key, value, full_path):
         # create Deployment
         metadata = V1ObjectMeta(name=MarathonMigrator.parse_id(value))
         metadata.annotations = {
@@ -42,7 +42,7 @@ class MarathonMigrator(Migrator):
         self.appid = value
         m = V1Deployment(metadata=metadata)
 
-        self.manifest.name=value
+        self.manifest.name = value
         self.manifest.append(m)
         self.deployment_name = value
 

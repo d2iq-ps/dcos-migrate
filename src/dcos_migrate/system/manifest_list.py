@@ -10,8 +10,13 @@ class ManifestList(StorableList):
         super(ManifestList, self).__init__(path)
         self._dry = dry
 
-    def find_manifest_by_name(self, name):
-        pass
+    def manifest(self, pluginName: str, manifestName: str):
+        ml = self.manifests(pluginName=pluginName)
+        for m in ml:
+            if m.name == manifestName:
+                return m
+
+        return None
 
     def clusterMeta(self) -> V1ObjectMeta:
         clustermanifests = self.manifests('cluster')

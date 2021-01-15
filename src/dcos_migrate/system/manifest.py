@@ -7,7 +7,7 @@ from kubernetes.client import ApiClient
 class Manifest(list):
     """docstring for Manifest."""
 
-    def __init__(self, pluginName: str, manifestName: str = "", data={},
+    def __init__(self, pluginName: str, manifestName: str = "", data=[],
                  extension='yaml'):
         super(Manifest, self).__init__()
         self._plugin_name = pluginName
@@ -16,6 +16,7 @@ class Manifest(list):
         self._extension = extension
         self._serializer = self.dumps
         self._deserializer = yaml.load_all
+        self.extend(data)
 
         self.resources = []
 
@@ -52,10 +53,17 @@ class Manifest(list):
     def extension(self) -> str:
         return self._extension
 
-    def find_resource_by_name(self, name):
+    def resource_by_name(self, name, apiVersion, kind):
         for r in self.resources:
-            if r.Name == name:
+            if r.Name == name and r.apiVersion == apiVersion and r.kind == kind:
                 return r
+        return None
+
+    def resource_idx_by_name(self, name, apiVersion, kind):
+        for i in range(self.resources):
+            r = self.resources[i]
+            if r.Name == name and r.apiVersion == apiVersion and r.kind == kind:
+                return i
         return None
 
     def serialize(self) -> str:
