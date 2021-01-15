@@ -45,3 +45,7 @@ def test_simple():
 
         assert mres is not None
         assert m.manifest[0].metadata.name == 'hello-world'
+        for k, v in data['labels'].items():
+            assert m.manifest[0].metadata.annotations['migration.dcos.d2iq.com/label/{k}'.format(
+                k=k)] == v
+        assert m.manifest[0].metadata.annotations['migration.dcos.d2iq.com/description'] == data['description']

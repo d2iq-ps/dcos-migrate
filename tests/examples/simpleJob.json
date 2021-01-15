@@ -1,7 +1,10 @@
 {
   "id": "hello-world",
+  "description": "test description",
   "dependencies": [],
-  "labels": {},
+  "labels": {
+    "FOO": "BAR"
+  },
   "run": {
     "cpus": 1,
     "mem": 128,
