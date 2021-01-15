@@ -23,13 +23,13 @@ class MetronomeMigrator(Migrator):
         self.secretOverwrites = secretOverwrites
         self.translate = {
             "id": self.initJob,
-            "dependencies": self.handleDependencies,
             "description": self.handleDescription,
             "labels.*": self.handleLabels,
+            "run.args":  self.handleRunArgs,
             "run.artifacts": self.handleArtifacts,
             "secrets": self.handleSecrets,
             "env": self.handleEnv,
-            "run.maxLaunchDelay|run.docker.parameters": self.noEquivalent
+            "dependencies|run.maxLaunchDelay|run.docker.parameters": self.noEquivalent
         }
 
     @property
@@ -42,6 +42,14 @@ class MetronomeMigrator(Migrator):
             self.manifest[0] = job
 
         self.manifest.append(job)
+
+    # if ".id" == key:
+    #     return update(
+    #         {
+    #             "metadata": {"name": dnsify(val)},
+    #             "spec": {"template": {"spec": {"containers": [{"name": dnsify(val)}]}}},
+    #         }
+    #     )
 
     def initJob(self, key, value, full_path):
         name = self.dnsify(value)
@@ -68,15 +76,35 @@ class MetronomeMigrator(Migrator):
     def handleDependencies(self, key, value, full_path):
         logging.warning("Not migrating dependencies")
 
+    # if ".description" == key:
+    #     if not val:
+    #         return result
+    #     return update({"metadata": {"annotations": {"description": val}}})
+
     def handleDescription(self, key, value, full_path):
         j = self.job
         j.metadata.annotations['migration.dcos.d2iq.com/description'] = value
         self.job = j
 
+    # if ".labels" == key:
+    #     return update({"metadata": {"labels": val}})
+
     def handleLabels(self, key, value, full_path):
         j = self.job
         j.metadata.annotations['migration.dcos.d2iq.com/label/{}'.format(
             key)] = value
+        self.job = j
+
+    # if re.match(".run.args", key):
+    #     return update_container(
+    #         {"args": result.get("run", {}).get("args", []).append(val)}
+    #     )
+
+    def handleRunArgs(self, key, value, full_path):
+        j = self.job
+
+        j.job_template.spec.template.spec.containers[0].args = value
+
         self.job = j
 
     def handleArtifacts(self, key, value, full_path):
