@@ -97,16 +97,13 @@ class SecretPlugin(MigratePlugin):
     def migrate(self, backupList: BackupList, manifestList: ManifestList, **kwargs) -> ManifestList:
         ml = ManifestList()
 
-        metadata = V1ObjectMeta()
-
-        clusterManifests = manifestList.manifests(pluginName='cluster')
-        if clusterManifests:
-            # we expect a single manifest
-            if clusterManifests[0][0]:
-                # set default annotations from cluster
-                metadata.annotations = clusterManifests[0][0].metadata.annotations
-
         for ba in backupList.backups(pluginName='secret'):
+            metadata = V1ObjectMeta()
+
+            clusterMeta = manifestList.clusterMeta()
+            if clusterMeta:
+                metadata.annotations = clusterMeta.annotations
+                
             logging.debug("Found backup {}".format(ba))
             b = ba.data
             fullPath = "/".join(filter(None, [b["path"], b["key"]]))

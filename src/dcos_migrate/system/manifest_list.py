@@ -1,6 +1,7 @@
 from .storable_list import StorableList
 from .manifest import Manifest
 from kubernetes.client.models import V1ObjectMeta
+import copy
 
 
 class ManifestList(StorableList):
@@ -23,7 +24,7 @@ class ManifestList(StorableList):
         # cluster creates a single manifest with a single Configmap
         if clustermanifests and clustermanifests[0] and clustermanifests[0][0]:
             clustercfg = clustermanifests[0][0]
-            return clustercfg.metadata
+            return copy.deepcopy(clustercfg.metadata)
 
         return None
 
