@@ -27,6 +27,7 @@ class MetronomeMigrator(Migrator):
             "labels.*": self.handleLabels,
             "run.args":  self.handleRunArgs,
             "run.cpus|gpus|mem|disk": self.handleLimits,
+            "run.args|cmd": self.handleCmd,
             "run.artifacts": self.handleArtifacts,
             "secrets": self.handleSecrets,
             "env": self.handleEnv,
@@ -87,7 +88,6 @@ class MetronomeMigrator(Migrator):
     def handleDescription(self, key, value, full_path):
         j = self.job
         j.metadata.annotations['migration.dcos.d2iq.com/description'] = value
-        self.job = j
 
     # if ".labels" == key:
     #     return update({"metadata": {"labels": val}})
@@ -96,7 +96,6 @@ class MetronomeMigrator(Migrator):
         j = self.job
         j.metadata.annotations['migration.dcos.d2iq.com/label/{}'.format(
             key)] = value
-        self.job = j
 
     # if re.match(".run.args", key):
     #     return update_container(
@@ -107,8 +106,6 @@ class MetronomeMigrator(Migrator):
         j = self.job
 
         j.spec.job_template.spec.template.spec.containers[0].args = value
-
-        self.job = j
 
     # if ".run.cpus" == key:
     #     if val == 0:
@@ -161,7 +158,19 @@ class MetronomeMigrator(Migrator):
 
         j.spec.job_template.spec.template.containers[0] = container
 
-        self.job = j
+    # if ".run.cmd" == key:
+    #     if not val:
+    #         return result
+    #     return update_container({"command": ["/bin/sh", "-c", val]})
+    #
+    # if re.match(".run.args", key):
+    #     return update_container(
+    #         {"args": result.get("run", {}).get("args", []).append(val)}
+    #     )
+
+    def handleCmd(self, key, value, full_path):
+        # if "cmd" == key & & value != "":
+        pass
 
     def handleArtifacts(self, key, value, full_path):
         pass
