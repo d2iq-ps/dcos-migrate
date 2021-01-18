@@ -48,7 +48,7 @@ class Migrator(object):
         for k, v in self.translate.items():
             expr = parse(k)
             for match in expr.find(self.object):
-                v(match.path, match.value, match.full_path)
+                v(str(match.path), match.value, str(match.full_path))
 
         return self.manifest
 

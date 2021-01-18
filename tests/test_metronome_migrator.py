@@ -49,3 +49,6 @@ def test_simple():
             assert m.manifest[0].metadata.annotations['migration.dcos.d2iq.com/label/{k}'.format(
                 k=k)] == v
         assert m.manifest[0].metadata.annotations['migration.dcos.d2iq.com/description'] == data['description']
+
+        assert m.manifest[0].spec.job_template.spec.template.containers[0].resources.limits is not None
+        assert m.manifest[0].spec.job_template.spec.template.containers[0].resources.limits["cpu"] == data['run']['cpus']

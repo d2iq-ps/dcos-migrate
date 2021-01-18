@@ -40,3 +40,5 @@ class MetronomePlugin(MigratePlugin):
             manifest = mig.migrate()
             if manifest:
                 ml.append(manifest)
+
+        return ml

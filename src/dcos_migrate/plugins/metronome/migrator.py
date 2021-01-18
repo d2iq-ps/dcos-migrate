@@ -1,5 +1,5 @@
 from dcos_migrate.system import Migrator, Manifest
-from kubernetes.client.models import V1beta1CronJob, V1beta1CronJobSpec, V1beta1JobTemplateSpec, V1JobSpec, V1ObjectMeta, V1PodSpec, V1Container
+from kubernetes.client.models import V1beta1CronJob, V1beta1CronJobSpec, V1beta1JobTemplateSpec, V1JobSpec, V1ObjectMeta, V1PodSpec, V1Container, V1ResourceRequirements
 import logging
 
 
@@ -26,6 +26,7 @@ class MetronomeMigrator(Migrator):
             "description": self.handleDescription,
             "labels.*": self.handleLabels,
             "run.args":  self.handleRunArgs,
+            "run.cpus|gpus|mem|disk": self.handleLimits,
             "run.artifacts": self.handleArtifacts,
             "secrets": self.handleSecrets,
             "env": self.handleEnv,
@@ -40,6 +41,7 @@ class MetronomeMigrator(Migrator):
     def job(self, job):
         if len(self.manifest) > 0:
             self.manifest[0] = job
+            return
 
         self.manifest.append(job)
 
@@ -67,7 +69,8 @@ class MetronomeMigrator(Migrator):
             suspend=True,
             job_template=V1beta1JobTemplateSpec(
                 spec=V1JobSpec(
-                    template=V1PodSpec(containers=[V1Container(name=name)])
+                    template=V1PodSpec(containers=[V1Container(name=name, resources=V1ResourceRequirements(limits={}, requests=None
+                                                                                                           ))])
                 )
             )
         )
@@ -103,7 +106,60 @@ class MetronomeMigrator(Migrator):
     def handleRunArgs(self, key, value, full_path):
         j = self.job
 
-        j.job_template.spec.template.spec.containers[0].args = value
+        j.spec.job_template.spec.template.spec.containers[0].args = value
+
+        self.job = j
+
+    # if ".run.cpus" == key:
+    #     if val == 0:
+    #         return result
+    #     return update_container({"resources": {"limits": {"cpu": val}}})
+    #
+    # if ".run.disk" == key:
+    #     if val == 0:
+    #         return result
+    #     return update_container({"resources": {"limits": {"ephemeral-storage": val}}})
+    #
+    # if ".run.gpus" == key:
+    #     if val == 0:
+    #         return result
+    #     return update_container(
+    #         {
+    #             "resources": {
+    #                 "requests": {"nvidia.com/gpu": val},
+    #                 "limits": {"nvidia.com/gpu": val},
+    #             },
+    #         }
+    #     )
+    #
+    # if ".run.mem" == key:
+    #     if val == 0:
+    #         return result
+    #     return update_container({"resources": {"limits": {"memory": str(val) + "Mi"}}})
+
+    def handleLimits(self, key, value, full_path):
+        j = self.job
+        container = j.spec.job_template.spec.template.containers[0]
+
+        if "cpus" == key:
+            container.resources.limits.update({"cpu": value})
+
+        if "mem" == key:
+            container.resources.limits["memory"] = str(
+                value) + "Mi"
+
+        if "disk" == key:
+            if value == 0:
+                return
+            container.resources.limits["ephemeral-storage"] = value
+
+        if "gpus" == key and value != 0:
+            if not container.resources:
+                container.resources.requests = {}
+            container.resources.requests["nvidia.com/gpu"] = value
+            container.resources.limits["nvidia.com/gpu"] = value
+
+        j.spec.job_template.spec.template.containers[0] = container
 
         self.job = j
 
