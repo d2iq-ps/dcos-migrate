@@ -2,11 +2,7 @@
   "id": "group1/predictionio-server",
   "container": {
     "docker": {
-      "image": "tobilg/mini-webserver",
-      "network": "BRIDGE",
-      "portMappings": [
-        { "containerPort": 80 }
-      ]
+      "image": "tobilg/mini-webserver"
     },
     "type": "DOCKER"
   },

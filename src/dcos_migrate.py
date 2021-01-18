@@ -71,5 +71,5 @@ class DCOSMigrate(object):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.WARNING)
     DCOSMigrate().run()

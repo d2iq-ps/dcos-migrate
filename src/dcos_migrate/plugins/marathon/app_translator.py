@@ -5,100 +5,15 @@ import os.path
 
 from collections import namedtuple
 
+from .mapping_utils import Translated, apply_mapping
+from .mapping_utils import ListExtension, finalize_unmerged_list_extensions
+
+
 Settings = namedtuple('Settings', ['container_defaults', 'imported_k8s_secret_name'])
 
 ContainerDefaults = namedtuple('ContainerDefaults', ['image', 'working_dir'])
 
 log = logging.getLogger(__name__) #pylint: disable=invalid-name
-
-class Translated(object):
-    """
-        A return value of all translator functions in GROUP_MAPPINGS
-    """
-    def __init__(self, update=None, warnings=None):
-        self.update = {} if update is None else update
-        self.warnings = [] if warnings is None else warnings
-
-    def merged_with(self, other):
-        return Translated(
-            update=deep_merge(self.update, other.update),
-            warnings=self.warnings + other.warnings
-        )
-
-
-def apply_mapping(mapping: dict, data: dict, error_location: str):
-    """
-    >>> mapper = lambda n: Translated({"outer": [{"inner": n*2}]})
-    >>> result, _ = apply_mapping({"foo": mapper}, {"foo": 21}, "")
-    >>> result == {"outer": [{"inner": 42}]}
-    True
-
-    >>> mapper = lambda d: Translated({"product": d['foo'] * d['bar']})
-    >>> result, _ = apply_mapping({("foo", "bar"): mapper}, {"foo": 21, "bar": 2}, "")
-    >>> result == {"product": 42}
-    True
-
-    >>> mapper = lambda n: Translated({"result": n})
-    >>> apply_mapping({"foo": mapper}, {"foo": 1, "bar": 2, "baz": 0}, "app")
-    Traceback (most recent call last):
-        ...
-    RuntimeError: "app" has fields "bar", "baz" that are not present in the field mappings
-
-    >>> mapper = lambda n: Translated({"result": n})
-    >>> apply_mapping({"foo": mapper, "bar": mapper}, {"foo": 1, "bar": 2}, "app")
-    Traceback (most recent call last):
-        ...
-    Exception: Error composing the result object for "app": Conflicting values for .result: 2 and 1
-
-    >>> broken_mapper = lambda n: str(n)
-    >>> apply_mapping({"foo": broken_mapper}, {"foo": 1}, "app")
-    Traceback (most recent call last):
-        ...
-    Exception: Bad translation result in "app" for key "foo"
-
-    """
-    def map_group(group, mapper):
-        if isinstance(group, tuple):
-            fields = set(group) & data.keys()
-            return fields, mapper({field: data[field] for field in fields})
-
-        try:
-            value = data[group]
-        except KeyError:
-            return set(), Translated()
-
-        return {group}, mapper(value)
-
-    unknown = data.keys()
-    result = {}
-    warnings = []
-
-    for key in sorted(mapping.keys(), key = str):
-        mapper = mapping[key]
-        mapped_app_fields, translated = map_group(key, mapper)
-        if not isinstance(translated, Translated):
-            raise Exception('Bad translation result in "{}" for key "{}"'.format(error_location, key))
-
-        warnings += ['"{}": {}'.format(key, warn) for warn in translated.warnings]
-
-        try:
-            result = deep_merge(result, translated.update)
-        except UpdateConflict as err:
-            raise Exception(
-                'Error composing the result object for "{}": {}'.format(error_location, err))
-
-        unknown -= mapped_app_fields
-
-    if unknown:
-        # We intentionally crash the script when unknown fields are discovered.
-        # The fields that cannot or should not be mapped should be explicitly added
-        # into the corresponding `generate_..._mappings()` function.
-        raise RuntimeError(
-            '"{}" has fields {} that are not present in the field mappings'.format(
-                error_location, ', '.join('"{}"'.format(_) for _ in sorted(unknown))))
-
-    return result, warnings
-
 
 
 def pod_spec_update(fields):
@@ -123,11 +38,13 @@ def translate_container_command(fields):
 
         # FIXME: Sanitize the cmdline against DCOS-specific stuff!
         return Translated(update=main_container({'command': cmdline}))
-    elif 'args' in fields:
+
+    if 'args' in fields:
         # FIXME: Sanitize the cmdline against DCOS-specific stuff!
         return Translated(update=main_container({'args': fields['args']}))
-    else:
-        return Translated()
+
+    return Translated()
+
 
 RESOURCE_TRANSLATION = {
     'cpus': lambda cpus: ('cpu', cpus),
@@ -143,7 +60,7 @@ def translate_resources(fields):
 
     def iter_requests():
         for key, value in app_requests.items():
-            if value != 0 :
+            if value != 0:
                 yield RESOURCE_TRANSLATION[key](value)
 
     def iter_limits():
@@ -297,9 +214,11 @@ def health_check_to_probe(check, get_port_by_index, error_location):
     }
 
     if check['protocol'] == 'COMMAND':
-        mapping['command.value'] = lambda command: Translated({'command': ["/bin/sh", "-c", command]})
+        mapping['command.value'] = \
+            lambda command: Translated({'command': ["/bin/sh", "-c", command]})
     else:
-        mapping[('protocol', 'port', 'portIndex', 'path')] = get_network_probe_builder(get_port_by_index)
+        mapping[('protocol', 'port', 'portIndex', 'path')] = \
+            get_network_probe_builder(get_port_by_index)
 
     probe, warnings = apply_mapping(mapping, flattened_check, error_location)
     probe.setdefault('initialDelaySeconds', 300)
@@ -320,35 +239,35 @@ def translate_health_checks(fields, error_location):
         port_mappings = fields.get('container', {}).get('portMappings')
         port_definitions = fields.get('portDefinitions')
         if port_mappings is None == port_definitions is None:
-            raise InvalidAppDefinition("Cannot get port by index as both portDefinitions and container.portMappings are set")
+            raise InvalidAppDefinition(
+                "Cannot get port by index as both portDefinitions"
+                " and container.portMappings are set")
 
-        if port_definitions is not None:
-            try:
-                port_data = port_definitions[index]
-            except IndexError:
-                raise InvalidAppDefinition("Port index {} used in health check missing from `portDefinitions`".format(index))
-
-            try:
-                return port_data['port']
-            except KeyError:
-                raise InvalidAppDefinition("`portDefinitions` contain no 'port' at index {} used in health check".format(index))
+        if port_definitions is None:
+            port_list, name = port_mappings, 'container.portMappings'
+            key = 'hostPort' if use_host_port else 'containerPort'
+        else:
+            port_list, name = port_definitions, 'portDefinitions'
+            key = 'port'
 
         try:
-            port_data = port_mappings[index]
+            port_data = port_list[index]
         except IndexError:
-            raise InvalidAppDefinition("Port index {} used in health check missing from `container.portMappings`".format(port_index))
+            raise InvalidAppDefinition(
+                "Port index {} used in a health check is missing from `{}`".format(index, name))
 
-        key = 'hostPort' if use_host_port else 'containerPort'
         try:
             return port_data[key]
         except KeyError:
-            raise InvalidAppDefinition("`container.portMappings` contain no '{}' at index {} used in health check".format(key, index))
+            raise InvalidAppDefinition(
+                "`{}` contain no '{}' at index {} used in health check".format(name, key, index))
 
     health_checks = fields.get('healthChecks', [])
     if len(health_checks) < 1:
         return Translated()
 
-    livenessProbe, warnings = health_check_to_probe(health_checks[0], get_port_by_index, error_location)
+    liveness_probe, warnings = health_check_to_probe(
+        health_checks[0], get_port_by_index, error_location)
 
     excess_health_checks = health_checks[1:]
     if excess_health_checks:
@@ -358,7 +277,7 @@ def translate_health_checks(fields, error_location):
                 try_oneline_dump(excess_health_checks)))
 
     return Translated(
-        update=main_container({'livenessProbe': livenessProbe}),
+        update=main_container({'livenessProbe': liveness_probe}),
         warnings=warnings
     )
 
@@ -393,7 +312,8 @@ def generate_root_mapping(settings: Settings, error_location):
     return {
         ('args', 'cmd'): translate_container_command,
 
-        ('backoffFactor', 'backoffSeconds'): skip_if_equals({'backoffFactor':1.0, 'backoffSeconds': 1.0}),
+        ('backoffFactor', 'backoffSeconds'):
+            skip_if_equals({'backoffFactor':1.0, 'backoffSeconds': 1.0}),
 
         'constraints': skip_if_equals([]),
 
@@ -411,7 +331,8 @@ def generate_root_mapping(settings: Settings, error_location):
 
         'executor': skip_if_equals(""),
 
-        'fetch': lambda fetches: translate_fetch(fetches, settings.container_defaults, error_location),
+        'fetch':
+            lambda fetches: translate_fetch(fetches, settings.container_defaults, error_location),
 
         ('healthChecks', 'container', 'portDefinitions'):
             lambda fields: translate_health_checks(fields, error_location),
@@ -426,7 +347,8 @@ def generate_root_mapping(settings: Settings, error_location):
 
         'maxLaunchDelaySeconds': skip_if_equals(300),
 
-        ('networks', 'portDefinitions', 'requirePorts'): skip_if_equals({}),  # translate_networking,
+        ('networks', 'portDefinitions', 'requirePorts'):
+            skip_if_equals({}),  # translate_networking,
 
         'residency': skip_if_equals({}),
 
@@ -470,7 +392,8 @@ def generate_fetch_command(uri: str, allow_extract: bool, executable: bool):
 def translate_fetch(fetches, defaults: ContainerDefaults, error_location):
     if not defaults.working_dir:
         raise AdditionalFlagNeeded(
-            '{} is using "fetch"; please specify non-empty `--container-working-dir` and run again'.format(error_location)
+            '{} is using "fetch"; please specify non-empty'
+            ' `--container-working-dir` and run again'.format(error_location)
         )
 
     warnings = ['This app uses "fetch"; consider using a container image instead.']
@@ -531,7 +454,8 @@ def get_container_translator(defaults: ContainerDefaults, error_location):
 
         if not defaults.image:
             raise AdditionalFlagNeeded(
-                '{} has no image; please specify non-empty `--default-image` and run again'.format(error_location)
+                '{} has no image; please specify non-empty'
+                ' `--default-image` and run again'.format(error_location)
             )
         container_update = {'image': defaults.image}
 
@@ -544,7 +468,8 @@ def get_container_translator(defaults: ContainerDefaults, error_location):
 
     def translate_volume(volume, name) -> Translated:
         def untranslatable():
-            return Translated(warnings=["Cannot translate a volume: {}".format(try_oneline_dump(volume))])
+            return Translated(warnings=[
+                "Cannot translate a volume: {}".format(try_oneline_dump(volume))])
 
         fields = volume.copy()
         try:
@@ -578,15 +503,18 @@ def get_container_translator(defaults: ContainerDefaults, error_location):
 
     def translate_volumes(volumes):
         result = Translated()
-        for n, volume in enumerate(volumes):
-            translated = translate_volume(volume, 'volume-{}'.format(n))
+        for index, volume in enumerate(volumes):
+            translated = translate_volume(volume, 'volume-{}'.format(index))
             result = result.merged_with(translated)
         return result
 
     def translate_container(fields):
         update, warnings = apply_mapping(
             mapping={
-                "docker.forcePullImage": lambda _: Translated(main_container({'imagePullPolicy': "Always" if _ else "IfNotPresent"})),
+                "docker.forcePullImage":
+                    lambda _: Translated(main_container({
+                        'imagePullPolicy': "Always" if _ else "IfNotPresent"})),
+
                 ("docker.image", ): translate_image,
                 "docker.parameters": skip_if_equals([]),
                 "docker.privileged": skip_if_equals(False),
@@ -643,107 +571,11 @@ def load(path: str):
     return [apps]
 
 
-# This is used in objects passed into `deep_merge()` to apply an alternative
-# way of merging lists: the list on the left is extended with items from
-# the ListExtension on the right.
-ListExtension = namedtuple('ListExtension', ['items'])
 
-
-class UpdateConflict(Exception):
-    pass
-
-
-def deep_merge(first, second, debug_prefix=''):
-    """
-    >>> result = deep_merge({5: 6, 3: {"bar": "baz"}}, {1: 2, 3: {"foo": "bar"}})
-    >>> result == {1: 2, 3: {"foo": "bar", "bar": "baz"}, 5: 6}
-    True
-
-    >>> result = deep_merge({1: 2, 3: {"foo": "bar"}}, {5: 6, 3: {"bar": "baz"}})
-    >>> result == {1: 2, 3: {"foo": "bar", "bar": "baz"}, 5: 6}
-    True
-
-    >>> result = deep_merge({3: [{"foo": "bar"}]}, {3: [{"bar": "baz"}, "deadbeef"]})
-    >>> result == {3: [{"foo": "bar", "bar": "baz"}, "deadbeef"]}
-    True
-
-    >>> result = deep_merge({3: [{"bar": "baz"}, "deadbeef"]}, {3: [{"foo": "bar"}]})
-    >>> result == {3: [{"foo": "bar", "bar": "baz"}, "deadbeef"]}
-    True
-
-    >>> deep_merge({"foo": 1}, {"foo": 1}) == {"foo": 1}
-    True
-
-    >>> deep_merge({"foo": 1}, {"foo": 2}) # doctest: +IGNORE_EXCEPTION_DETAIL
-    Traceback (most recent call last):
-        ...
-    UpdateConflict: Conflicting values for .foo: 1 and 2
-
-    >>> deep_merge([1], ListExtension([2]))
-    [1, 2]
-
-    >>> deep_merge(ListExtension([1, 2]), [3])
-    [3, 1, 2]
-
-    >>> result = deep_merge(ListExtension([1]), ListExtension([2]))
-    >>> result == ListExtension([1, 2])
-    True
-
-    >>> result = deep_merge({"foo": [1]}, {"foo": ListExtension([2])})
-    >>> result == {"foo": [1, 2]}
-    True
-
-    >>> result = deep_merge({"foo": ListExtension([1])}, {"bar": [2]})
-    >>> result == {"foo": ListExtension([1]), "bar": [2]}
-    True
-    """
-    if all(isinstance(_, dict) for _ in (first, second)):
-        def iter_items():
-            for key in first.keys() - second.keys():
-                yield key, first[key]
-            for key in second.keys() - first.keys():
-                yield key, second[key]
-            for key in first.keys() & second.keys():
-                yield key, deep_merge(first[key], second[key], debug_prefix + '.' + str(key))
-
-        return dict(iter_items())
-
-    if all(isinstance(_, list) for _ in (first, second)):
-        min_len = min(len(first), len(second))
-        return [deep_merge(first[n], second[n], '{}[{}]'.format(debug_prefix, n)) for n in range(min_len)] \
-            + first[min_len:] + second[min_len:]
-
-    if any(isinstance(_, ListExtension) for _ in (first, second)):
-        base, extension = (first, second) if isinstance(second, ListExtension) else (second, first)
-        if isinstance(base, ListExtension):
-            return ListExtension(base.items + extension.items)
-        if isinstance(base, list):
-            return base + extension.items
-
-    if first == second:
-        return first
-
-    raise UpdateConflict(
-        'Conflicting values for {}: {} and {}'.format(debug_prefix, first, second))
-
-
-def finalize_unmerged_list_extensions(merged):
-    if isinstance(merged, ListExtension):
-        merged = merged.items
-
-    if isinstance(merged, list):
-        return [finalize_unmerged_list_extensions(item) for item in merged]
-
-    if isinstance(merged, dict):
-        return {key: finalize_unmerged_list_extensions(value) for key, value in merged.items()}
-
-    return merged
-
-
-def translate_app(app: dict, container_defaults: ContainerDefaults):
+def translate_app(app: dict, settings: Settings):
     error_location = "app " + app.get('id', '(NO ID)')
 
-    mapping = generate_root_mapping(container_defaults, error_location)
+    mapping = generate_root_mapping(settings, error_location)
 
     try:
         definition, warnings = apply_mapping(mapping, app, error_location)
