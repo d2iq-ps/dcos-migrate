@@ -31,14 +31,14 @@ class ManifestList(StorableList):
     def manifests(self, pluginName: str):
         ml = ManifestList()
         for m in self:
-            if m.plugin_name == pluginName:
+            if m and m.plugin_name == pluginName:
                 ml.append(m)
 
         return ml
 
     def append_data(self, pluginName: str, backupName: str,
-                    extenstion: str, data: str):
-        b = Manifest(pluginName=pluginName, backupName=backupName,
-                     extenstion=extenstion).deserialize(data)
+                    extension: str, data: str, **kw):
+        b = Manifest(pluginName=pluginName, manifestName=backupName,
+                     extension=extension).deserialize(data)
 
         self.append(b)
