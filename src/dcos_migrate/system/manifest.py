@@ -1,7 +1,9 @@
 import yaml
 import logging
+import inspect
 
 from kubernetes.client import ApiClient
+import kubernetes.client.models
 
 
 class Manifest(list):
@@ -9,14 +11,12 @@ class Manifest(list):
 
     def __init__(self, pluginName: str, manifestName: str = "", data=[],
                  extension='yaml'):
-        super(Manifest, self).__init__()
+        super(Manifest, self).__init__(data)
         self._plugin_name = pluginName
         self._name = manifestName
-        self._data = data
         self._extension = extension
         self._serializer = self.dumps
         self._deserializer = yaml.load_all
-        self.extend(data)
 
         self.resources = []
 
@@ -70,12 +70,34 @@ class Manifest(list):
         return self._serializer(self)
 
     def deserialize(self, data: str) -> object:
-        self._data = self._deserializer(self)
+        for ds in self._deserializer(data):
+            if ds is not None:
+                if 'apiVersion' in ds and 'kind' in ds:
+                    model = self.getModel(ds['kind'], ds['apiVersion'])
+                    if model:
+                        kc = ApiClient()
+                        di = kc._ApiClient__deserialize(ds, model)
+                        self.append(di)
+                    continue
+
+                self.append(ds)
 
     @staticmethod
     def renderManifestName(name: str) -> str:
         # replace path with dashes
         return "-".join(list(filter(None, name.split("/"))))
+
+    @classmethod
+    def genModelName(self, apiVersion: str, kind: str):
+        apiv = apiVersion.split("/")[-1]
+        return "{}{}".format(apiv[0].upper()+apiv[1:], kind)
+
+    @classmethod
+    def getModel(self, kind: str, apiVersion: str):
+        for cls in inspect.getmembers(kubernetes.client.models, inspect.isclass):
+            if cls[0] == self.genModelName(apiVersion, kind):
+                return cls[1]
+        return None
 
     def findall_by_annotation(self, annotation, value=None):
         rs = []
