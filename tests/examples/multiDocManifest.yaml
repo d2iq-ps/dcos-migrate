@@ -3,7 +3,7 @@ apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
   annotations:
-    migration.dcos.d2iq.com/cluster-id: fe41a2d8-d1c3-4933-bb72-d5b2f8d4133c
+    migration.dcos.d2iq.com/cluster-id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     migration.dcos.d2iq.com/cluster-name: master
     migration.dcos.d2iq.com/backup-date: '2021-01-19'
     migration.dcos.d2iq.com/description: test description
