@@ -43,7 +43,7 @@ class DCOSSecretsService:
         url = self.url + '/secret/{store}/{path}'.format(
             store=urllib.parse.quote(self.store), path=urllib.parse.quote(full_path)
         )
-        r = self.client.get(url)
+        r = self.client.get(url, headers={'Accept': '*/*'})
         r.raise_for_status()
         content_type = r.headers['Content-Type']
         if content_type == 'application/octet-stream':
@@ -103,7 +103,7 @@ class SecretPlugin(MigratePlugin):
             clusterMeta = manifestList.clusterMeta()
             if clusterMeta:
                 metadata.annotations = clusterMeta.annotations
-                
+
             logging.debug("Found backup {}".format(ba))
             b = ba.data
             fullPath = "/".join(filter(None, [b["path"], b["key"]]))
