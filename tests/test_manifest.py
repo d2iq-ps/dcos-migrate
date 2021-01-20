@@ -16,3 +16,5 @@ def test_manifest_deserialize_multidoc_model():
         assert len(m) == 2
         assert isinstance(m[0], V1beta1CronJob)
         assert isinstance(m[1], V1Secret)
+
+        assert m[0].metadata.name == "hello-world"

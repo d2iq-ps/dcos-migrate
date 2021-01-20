@@ -16,7 +16,7 @@ class Manifest(list):
         self._name = manifestName
         self._extension = extension
         self._serializer = self.dumps
-        self._deserializer = yaml.load_all
+        self._deserializer = yaml.safe_load_all
 
         self.resources = []
 
@@ -69,18 +69,27 @@ class Manifest(list):
     def serialize(self) -> str:
         return self._serializer(self)
 
-    def deserialize(self, data: str) -> object:
-        for ds in self._deserializer(data):
-            if ds is not None:
-                if 'apiVersion' in ds and 'kind' in ds:
-                    model = self.getModel(ds['kind'], ds['apiVersion'])
-                    if model:
-                        kc = ApiClient()
-                        di = kc._ApiClient__deserialize(ds, model)
-                        self.append(di)
-                    continue
+    def deserialize(self, data: str):
+        dload = self._deserializer(data)
+        for dsi in dload:
+            ds = dict(dsi)
+            if ds is None:
+                logging.warning(
+                    "serialized object is none of data: {}".format(data))
+                continue
 
-                self.append(ds)
+            if 'apiVersion' in ds and 'kind' in ds:
+                model = self.getModel(ds['kind'], ds['apiVersion'])
+                if model:
+                    kc = ApiClient()
+                    di = kc._ApiClient__deserialize(ds, model)
+                    self.append(di)
+                continue
+            else:
+                logging.warning(
+                    "Missing apiVersion and/or kind in data: {}".format(ds))
+
+            self.append(ds)
 
     @staticmethod
     def renderManifestName(name: str) -> str:

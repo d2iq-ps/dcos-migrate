@@ -39,6 +39,8 @@ class ManifestList(StorableList):
     def append_data(self, pluginName: str, backupName: str,
                     extension: str, data: str, **kw):
         b = Manifest(pluginName=pluginName, manifestName=backupName,
-                     extension=extension).deserialize(data)
+                     extension=extension)
+        b.deserialize(data)
 
-        self.append(b)
+        if b is not None:
+            self.append(b)
