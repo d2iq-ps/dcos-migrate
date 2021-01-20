@@ -1,4 +1,6 @@
-import click
+#!/bin/env python
+
+# import click - not yet used not yet in requirements
 import logging
 from dcos_migrate.system import DCOSClient, BackupList, ManifestList
 from dcos_migrate.plugins.plugin_manager import PluginManager
