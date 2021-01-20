@@ -13,11 +13,11 @@ import sys
 # This script relies on python-yaml installed via pip, system package manager or some other means.
 import yaml
 
-from lib.app_translator import *
+from lib.app_translator import ContainerDefaults, Settings, load, translate_app
 
 log = logging.getLogger(__name__) #pylint: disable=invalid-name
 
-def translate(path: str, container_defaults: ContainerDefaults, selected_app_id):
+def translate(path: str, settings: Settings, selected_app_id):
     apps = load(path)
     for app in apps:
         app_id = app.get('id', "(NO ID)")
@@ -27,7 +27,7 @@ def translate(path: str, container_defaults: ContainerDefaults, selected_app_id)
         dcos_package_name = app.get('labels', {}).get("DCOS_PACKAGE_NAME")
 
         if dcos_package_name is None:
-            result, warnings = translate_app(app, container_defaults)
+            result, warnings = translate_app(app, settings)
             print("# Converted from an app {}".format(app_id))
             print("\n\n".join([''] + warnings).replace('\n', '\n# '))
             print(yaml.safe_dump(result))

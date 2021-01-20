@@ -210,7 +210,7 @@ class TestSecrets:
             assert response['path'] == ''
             assert response['key'] == 'folder/sub/key4'
             assert response['type'] == 'text'
-            assert json.loads(base64.b64decode(response['value'])) == {
+            assert json.loads(base64.b64decode(response['value']).decode('utf-8')) == {
                 "login_endpoint": "https://leader.mesos/acs/api/v1/auth/login",
                 "private_key": PRIVATE_KEY,
                 "scheme": "RS256",
@@ -239,7 +239,7 @@ class TestSecrets:
             assert response['path'] == 'folder'
             assert response['key'] == 'sub/key4'
             assert response['type'] == 'text'
-            assert json.loads(base64.b64decode(response['value'])) == {
+            assert json.loads(base64.b64decode(response['value']).decode('utf-8')) == {
                 "login_endpoint": "https://leader.mesos/acs/api/v1/auth/login",
                 "private_key": PRIVATE_KEY,
                 "scheme": "RS256",
@@ -250,7 +250,7 @@ class TestSecrets:
             assert response['path'] == 'folder/sub'
             assert response['key'] == 'key4'
             assert response['type'] == 'text'
-            assert json.loads(base64.b64decode(response['value'])) == {
+            assert json.loads(base64.b64decode(response['value']).decode('utf-8')) == {
                 "login_endpoint": "https://leader.mesos/acs/api/v1/auth/login",
                 "private_key": PRIVATE_KEY,
                 "scheme": "RS256",
@@ -270,7 +270,7 @@ class TestSecrets:
             # Test backup of DC/OS secrets
 
             dcosfile1 = tmp_path / 'output-1'
-            backup.run(['--no-verify', '--output', str(dcosfile1)])
+            backup.run(['--dcos-cli', cli.path, '--no-verify', '--output', str(dcosfile1)])
             assert stat.S_IMODE(dcosfile1.stat().st_mode) == 0o600
             with dcosfile1.open() as f:
                 response = json.load(f)
@@ -278,7 +278,12 @@ class TestSecrets:
             assert keys == {'key1', 'folder/key2', 'folder/key3', 'folder/sub', 'folder/sub/key4'}
 
             dcosfile2 = tmp_path / 'output-2'
-            backup.run(['--no-verify', '--path', 'folder', '--output', str(dcosfile2)])
+            backup.run([
+                '--dcos-cli', cli.path,
+                '--no-verify',
+                '--path', 'folder',
+                '--output', str(dcosfile2)
+                ])
             assert stat.S_IMODE(dcosfile2.stat().st_mode) == 0o600
             with dcosfile2.open() as f:
                 response = json.load(f)
@@ -288,7 +293,12 @@ class TestSecrets:
             # When backing up a path that is a secret and a folder, only the secrets under the
             # folder are exported, not the secret at the named path.
             dcosfile3 = tmp_path / 'output-3'
-            backup.run(['--no-verify', '--path', 'folder/sub', '--output', str(dcosfile3)])
+            backup.run([
+                '--dcos-cli', cli.path,
+                '--no-verify',
+                '--path', 'folder/sub',
+                '--output', str(dcosfile3)
+            ])
             assert stat.S_IMODE(dcosfile3.stat().st_mode) == 0o600
             with dcosfile3.open() as f:
                 response = json.load(f)
@@ -298,12 +308,11 @@ class TestSecrets:
             # The command will not work without a CA flag as the test DC/OS cluster CA is not in the
             # system CA bundle.
             with pytest.raises(requests.exceptions.SSLError):
-                backup.run(
-                    [
-                        '--path', 'folder/sub/key4',
-                        '--output', str(dcosfile3)
-                    ]
-                )
+                backup.run([
+                    '--dcos-cli', cli.path,
+                    '--path', 'folder/sub/key4',
+                    '--output', str(dcosfile3)
+                ])
 
             # Download the CA certificate for the cluster to verify subsequent connections. Since we
             # don't yet have the CA certificate, this request cannot be verified (and hence is
@@ -315,13 +324,12 @@ class TestSecrets:
             ca_path.write_bytes(cert)
 
             dcosfile4 = tmp_path / 'output-4'
-            backup.run(
-                [
-                    '--ca-file', str(ca_path),
-                    '--path', 'folder/sub/key4',
-                    '--output', str(dcosfile4)
-                ]
-            )
+            backup.run([
+                '--dcos-cli', cli.path,
+                '--ca-file', str(ca_path),
+                '--path', 'folder/sub/key4',
+                '--output', str(dcosfile4)
+            ])
             assert stat.S_IMODE(dcosfile4.stat().st_mode) == 0o600
             with dcosfile4.open() as f:
                 response = json.load(f)['secrets']
@@ -443,7 +451,7 @@ class TestSecrets:
                 stderr=subprocess.STDOUT,
                 check=True
             )
-            items = json.loads(p.stdout)['items']
+            items = json.loads(p.stdout.decode('utf-8'))['items']
             assert len(items) == 1
             reverse_map = json.loads(
                 items[0]['metadata']['annotations'][DCOS_PREFIX + '/dcos-secret']
