@@ -1,5 +1,6 @@
 from dcos_migrate.system import Migrator, Manifest
 from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret
+from kubernetes.client import ApiClient
 from random import randrange
 from .app_translator import ContainerDefaults, translate_app, Settings, clean_secret_key
 
@@ -33,7 +34,9 @@ class MarathonMigrator(Migrator):
             pluginName="marathon", manifestName=self.dnsify(value))
         app, warning = translate_app(self.object, settings)
 
-        self.manifest.append(app)
+        kc = ApiClient()
+        dapp = kc._ApiClient__deserialize(app, V1Deployment)
+        self.manifest.append(dapp)
         if self.secret is not None:
             self.manifest.append(self.secret)
 

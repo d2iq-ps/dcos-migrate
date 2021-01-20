@@ -41,6 +41,6 @@ class MarathonPlugin(MigratePlugin):
 
                 if manifest:
                     ml.append(manifest)
-            except:
-                logging.warning("Cannot migrate {}".format(b.data))
+            except Exception as e:
+                logging.warning("Cannot migrate: {}".format(e))
         return ml
