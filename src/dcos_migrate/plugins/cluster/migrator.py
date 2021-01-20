@@ -2,7 +2,7 @@ from dcos_migrate.system import Migrator
 
 
 class ClusterMigrator(Migrator):
-    """docstring for SecretsMigrator."""
+    """docstring for ClusterMigrator."""
 
     def __init__(self, **kw):
         super(ClusterMigrator, self).__init__(**kw)
