@@ -54,11 +54,11 @@ class MarathonMigrator(Migrator):
             self.secret.api_version = 'v1'
             self.secret.kind = 'Secret'
 
-        sec = Manifest.renderManifestName(value['source'])
+        sec = clean_secret_key(value['source'])
 
         sourceSecret = self.manifest_list.manifest(
             pluginName='secret', manifestName=sec)
 
         if sourceSecret:
             for v in sourceSecret[0].data.values():
-                self.secret.data[key] = v
+                self.secret.data[sec] = v

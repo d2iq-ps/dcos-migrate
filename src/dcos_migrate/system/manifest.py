@@ -94,7 +94,7 @@ class Manifest(list):
     @staticmethod
     def renderManifestName(name: str) -> str:
         # replace path with dashes
-        return "-".join(list(filter(None, name.split("/"))))
+        return ".".join(list(filter(None, name.split("/"))))
 
     @classmethod
     def genModelName(self, apiVersion: str, kind: str):
