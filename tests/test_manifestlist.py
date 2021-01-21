@@ -25,14 +25,21 @@ def test_load():
     ml = ManifestList(path='tests/examples/simpleWithSecret')
     ml.load()
 
+    secrets = [{'secret1': 'Zm9vYmFy'}, {'test-secret2': 'YmF6'}]
     assert ml is not None
     assert len(ml) == 2
-    assert ml[0] is not None
-    assert len(ml[0]) > 0
-    assert ml[0][0].kind == "Secret"
-    assert ml[0][0].api_version == "v1"
-    assert ml[0][0].data is not None
-    assert ml[0][0].data == {'secret1': 'Zm9vYmFy'}
+    for m in ml:
+        assert m is not None
+        assert len(m) > 0
+        for s in m:
+            assert s.kind == "Secret"
+            assert s.api_version == "v1"
+            assert s.data is not None
+            assert s.data in secrets
+            # Remove found secrets from the list to ensure they appear only once
+            secrets.remove(s.data)
+    # We found all the expected secrets
+    assert len(secrets) == 0
 
 
 def test_load_manifest(tmpdir):
