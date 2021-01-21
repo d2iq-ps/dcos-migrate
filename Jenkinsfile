@@ -12,38 +12,13 @@ pipeline {
     DCOS_EE_URL = credentials('0b513aad-e0e0-4a82-95f4-309a80a02ff9')
   }
   stages {
-    stage("Unit Test") {
-      parallel {
-        stage("Marathon") {
-          agent {
-            dockerfile true
-          }
-          steps {
-            // don't know why yet, but the runtime on CI does some magic with virtualenvs and as a quickfix we put a seemingly redundant `pipenv install` here.
-            sh 'pipenv install && cd marathon && pipenv run pytest'
-          }
-        }
-        stage("Metronome") {
-          agent {
-            dockerfile true
-          }
-          steps {
-            // don't know why yet, but the runtime on CI does some magic with virtualenvs and as a quickfix we put a seemingly redundant `pipenv install` here.
-            sh 'pipenv install && pipenv run pytest --doctest-modules metronome'
-          }
-        }
-      }
-    }
-
-    stage("Integration Test") {
+    stage("Tox") {
       agent {
-        label "mesos-ec2-debian-9"
+        label "py37"
       }
       steps {
-        sh 'sudo apt-get update'
-        sh 'sudo apt-get install -y python3-dev python3-venv python3-wheel'
-        sh 'curl --output tests/dcos_generate_config.ee.sh ${DCOS_EE_URL}'
-        sh 'tests/run-tests.sh -v'
+        sh 'pip install tox'
+        sh 'tox'
       }
     }
   }

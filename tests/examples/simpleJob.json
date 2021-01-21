@@ -1,0 +1,44 @@
+{
+  "id": "hello-world",
+  "description": "test description",
+  "dependencies": [],
+  "labels": {
+    "FOO": "BAR"
+  },
+  "run": {
+    "cpus": 1,
+    "mem": 128,
+    "disk": 0,
+    "gpus": 0,
+    "cmd": "echo \"hello world\"",
+    "env": {},
+    "placement": {
+      "constraints": []
+    },
+    "artifacts": [],
+    "maxLaunchDelay": 3600,
+    "ucr": {
+      "image": {
+        "id": "alpine",
+        "kind": "docker",
+        "forcePull": false
+      },
+      "privileged": false
+    },
+    "volumes": [],
+    "restart": {
+      "policy": "NEVER"
+    },
+    "secrets": {},
+    "networks": []
+  },
+  "schedules": [{
+    "id": "5min",
+    "cron": "*/5 * * * *",
+    "timezone": "UTC",
+    "startingDeadlineSeconds": 900,
+    "concurrencyPolicy": "ALLOW",
+    "enabled": true,
+    "nextRunAt": "2021-01-14T12:15:00.000+0000"
+  }]
+}
