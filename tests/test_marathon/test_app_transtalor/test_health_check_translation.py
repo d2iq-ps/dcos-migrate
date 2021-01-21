@@ -1,6 +1,6 @@
 import pytest
 
-from ..lib import app_translator
+from dcos_migrate.plugins.marathon import app_translator
 
 EMPTY_SETTINGS = app_translator.Settings(
     app_translator.ContainerDefaults(
