@@ -7,7 +7,7 @@ class MigratePlugin(object):
     backup_depends = []
     backup_data_depends = []
     migrate_depends = []
-    migrate_data_ddepends = []
+    migrate_data_depends = []
     config_options = []
 
     def __init__(self, config={}):

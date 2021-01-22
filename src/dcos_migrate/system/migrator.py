@@ -1,14 +1,12 @@
 import json
 import logging
-import re
 from jsonpath_ng.ext import parse
 from dcos_migrate.system import ManifestList, BackupList, Backup, Manifest
+import dcos_migrate.utils as utils
 
 
 class Migrator(object):
     """docstring for Migrator."""
-
-    _invalid_secret_key = re.compile("[^-._a-zA-Z0-9]")
 
     def __init__(self, backup=None, backup_list=None, manifest_list=None, object=None):
         super(Migrator, self).__init__()
@@ -26,20 +24,8 @@ class Migrator(object):
         """Returns True if self.object is what we expect"""
         return True
 
-    def clean_key(self, s: str) -> str:
-        # Replace DC/OS folders with dots
-        s = s.replace("/", ".")
-        # Replace other invalid characters with `_`
-        # `folder/sec!ret` becomes `folder.sec_ret`
-        return self._invalid_secret_key.sub("_", s).lstrip(".")
-
     def dnsify(self, name: str):
-        _invalid_secret_key = re.compile('[^-._a-zA-Z0-9]')
-        # Replace DC/OS folders with dots
-        new_name = ".".join(list(filter(None, name.split("/"))))
-        # Replace other invalid characters with `_`
-        # `folder/sec!ret` becomes `folder.sec_ret`
-        new_name = _invalid_secret_key.sub('_', new_name)
+        new_name = utils.dnsify(name)
         if not name == new_name:
             logging.info(
                 f'"{name}" is not a valid name in kubernetes. converted it to "{new_name}".'

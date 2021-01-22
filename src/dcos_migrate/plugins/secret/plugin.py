@@ -1,6 +1,7 @@
 from dcos_migrate.plugins.plugin import MigratePlugin
 from dcos_migrate.plugins.cluster import ClusterPlugin
 from dcos_migrate.system import DCOSClient, BackupList, Backup, Manifest, ManifestList
+import dcos_migrate.utils as utils
 
 from kubernetes.client.models import V1Secret, V1ObjectMeta
 
@@ -107,9 +108,9 @@ class SecretPlugin(MigratePlugin):
             logging.debug("Found backup {}".format(ba))
             b = ba.data
             fullPath = "/".join(filter(None, [b["path"], b["key"]]))
-            name = Manifest.renderManifestName(b["key"])
+            name = utils.dnsify(b["key"])
 
-            metadata.annotations["migration.dcos.d2iq.com/secrets/secretpath"] = fullPath
+            metadata.annotations[utils.namespace_path("secrets/secretpath")] = fullPath
             metadata.name = name
             sec = V1Secret(metadata=metadata)
             sec.api_version = 'v1'

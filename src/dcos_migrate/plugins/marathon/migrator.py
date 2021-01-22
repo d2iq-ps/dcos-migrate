@@ -1,8 +1,9 @@
 from dcos_migrate.system import Migrator, Manifest
+import dcos_migrate.utils as utils
 from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret
 from kubernetes.client import ApiClient
 from random import randrange
-from .app_translator import ContainerDefaults, translate_app, Settings, clean_secret_key
+from .app_translator import ContainerDefaults, translate_app, Settings
 import logging
 
 
@@ -47,13 +48,13 @@ class MarathonMigrator(Migrator):
             if clusterMeta:
                 metadata.annotations = clusterMeta.annotations
             appid = self.dnsify(self.object['id'])
-            metadata.annotations["migration.dcos.d2iq.com/marathon-appid"] = self.object['id']
+            metadata.annotations[utils.namespace_path("marathon-appid")] = self.object['id']
             metadata.name = "marathonsecret-{}".format(appid)
             self.secret = V1Secret(metadata=metadata, data={})
             self.secret.api_version = 'v1'
             self.secret.kind = 'Secret'
 
-        sec = clean_secret_key(value['source'])
+        sec = utils.dnsify(value['source'])
 
         sourceSecret = self.manifest_list.manifest(
             pluginName='secret', manifestName=sec)

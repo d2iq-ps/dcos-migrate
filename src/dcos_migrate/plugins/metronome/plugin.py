@@ -10,7 +10,7 @@ class MetronomePlugin(MigratePlugin):
     """docstring for MetronomePlugin."""
 
     plugin_name = "metronome"
-    depends_migrate = [ClusterPlugin.plugin_name, SecretPlugin.plugin_name]
+    migrate_depends = [ClusterPlugin.plugin_name, SecretPlugin.plugin_name]
 
     def __init__(self):
         super(MetronomePlugin, self).__init__()

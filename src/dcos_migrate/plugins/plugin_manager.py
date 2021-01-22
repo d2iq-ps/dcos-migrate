@@ -115,5 +115,5 @@ class PluginManager(object):
                                               depattr="migrate_depends")
         logging.debug("Migrate batches {}".format(self.migrate))
         self.migrate_data = get_dependency_batches(plugins=self.plugins,
-                                                   depattr="migrate_data_ddepends")
+                                                   depattr="migrate_data_depends")
         logging.debug("Migrate Data batches {}".format(self.migrate_data))

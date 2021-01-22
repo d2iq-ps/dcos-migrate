@@ -1,5 +1,6 @@
 from dcos_migrate.plugins.plugin import MigratePlugin
 from dcos_migrate.system import BackupList, DCOSClient, Backup, Manifest, ManifestList
+import dcos_migrate.utils as utils
 from kubernetes.client.models import V1ConfigMap, V1ObjectMeta
 import json
 import logging
@@ -50,9 +51,9 @@ class ClusterPlugin(MigratePlugin):
         metadata = V1ObjectMeta(
             name="dcos-{}".format(clusterBackup.data['CLUSTER_ID']))
         metadata.annotations = {
-            "migration.dcos.d2iq.com/cluster-id": clusterBackup.data['CLUSTER_ID'],
-            "migration.dcos.d2iq.com/cluster-name": clusterBackup.data['CLUSTER'],
-            "migration.dcos.d2iq.com/backup-date": clusterBackup.data['BACKUP_DATE'],
+            utils.namespace_path("cluster-id"): clusterBackup.data['CLUSTER_ID'],
+            utils.namespace_path("cluster-id"): clusterBackup.data['CLUSTER'],
+            utils.namespace_path("cluster-id"): clusterBackup.data['BACKUP_DATE'],
         }
         cfgmap = V1ConfigMap(metadata=metadata)
         # models do not set defaults -.-
