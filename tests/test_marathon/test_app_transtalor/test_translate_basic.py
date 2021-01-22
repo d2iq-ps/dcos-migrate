@@ -1,8 +1,9 @@
-from ..lib import app_translator
 import os
 import sys
 
 import pytest
+
+from dcos_migrate.plugins.marathon import app_translator
 
 def new_settings(image: str = "busybox"):
     return app_translator.Settings(
@@ -17,7 +18,9 @@ def new_settings(image: str = "busybox"):
 
 def test_happy_path_sleeper():
     settings = new_settings()
-    hello_app = app_translator.load("test/resources/simple-command-app.json")[0]
+    hello_app = app_translator.load(
+        "tests/test_marathon/test_app_transtalor/resources/simple-command-app.json")[0]
+
     result, warnings = app_translator.translate_app(hello_app, settings)
 
     assert(result['kind'] == "Deployment")
@@ -88,7 +91,8 @@ def test_image_should_be_present_somewhere():
 
 def test_translates_args():
     settings = new_settings()
-    hello_app = app_translator.load("test/resources/container-args-app.json")[0]
+    hello_app = app_translator.load("tests/test_marathon/test_app_transtalor/resources/container-args-app.json")[0]
+
     result, warnings = app_translator.translate_app(hello_app, settings)
 
     assert(result['kind'] == "Deployment")

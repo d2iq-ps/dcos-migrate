@@ -1,6 +1,6 @@
 import pytest
 
-from ..lib import app_translator
+from dcos_migrate.plugins.marathon import app_translator
 
 def test_host_path_volumes():
     settings = app_translator.Settings(

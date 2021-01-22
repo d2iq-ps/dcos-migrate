@@ -5,7 +5,7 @@ Backup and Migrate DC/OS workloads to DKP
 At the moment only a full backup and migrate run is supported:
 `python ./src/dcos_migrate.py`
 
-this will create a folder dcos-migrate in the current direkty. It contains a `backup` folder with a complete backup of all workloads. And a `migrate` folder.
+This will create a sub-folder `dcos-migrate` in the current working directory. It contains a `backup` folder with a complete backup of all workloads. And a `migrate` folder.
 
 
 ## Migrated Manifests
