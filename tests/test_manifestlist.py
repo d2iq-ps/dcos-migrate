@@ -25,7 +25,7 @@ def test_load():
     ml = ManifestList(path='tests/examples/simpleWithSecret')
     ml.load()
 
-    secrets = [{'secret1': 'Zm9vYmFy'}, {'test-secret2': 'YmF6'}]
+    secrets = [{'secret1': 'Zm9vYmFy'}, {'test.secret2': 'YmF6'}]
     assert ml is not None
     assert len(ml) == 2
     for m in ml:
