@@ -56,3 +56,16 @@ def test_load_manifest(tmpdir):
     assert len(list) == len(list2)
     # and data
     assert list[0][0].data == list2[0][0].data
+
+
+def test_manifest():
+    ml = ManifestList(path='tests/examples/simpleWithSecret')
+    ml.load()
+
+    assert len(ml) == 2
+
+    sec2 = ml.manifest(pluginName="secret", manifestName="test.secret2")
+
+    assert sec2 is not None
+    assert len(sec2) == 1
+    assert sec2[0].metadata.name == "test.secret2"
