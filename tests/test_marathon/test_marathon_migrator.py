@@ -48,4 +48,16 @@ def test_simple_with_secret():
         assert mres is not None
         # assert m.manifest[0]['metadata']['name'] == 'predictionio-server.group1'
         assert m.manifest[0].metadata.name == 'group1.predictionio-server'
-        assert m.manifest[1].metadata.name == 'marathonsecret-group1-predictionio-server'
+        assert m.manifest[1].metadata.name == 'marathonsecret-group1.predictionio-server'
+
+        assert m.manifest[0].spec.template.spec.containers[0].env[
+            0].value_from.secret_key_ref.name == "marathonsecret-group1.predictionio-server"
+        assert m.manifest[0].spec.template.spec.containers[0].env[
+            0].value_from.secret_key_ref.key == "secret1"
+        assert m.manifest[0].spec.template.spec.containers[0].env[
+            1].value_from.secret_key_ref.name == "marathonsecret-group1.predictionio-server"
+        assert m.manifest[0].spec.template.spec.containers[0].env[
+            1].value_from.secret_key_ref.key == "test.secret2"
+
+        assert 'secret1' in m.manifest[1].data
+        assert 'test.secret2' in m.manifest[1].data

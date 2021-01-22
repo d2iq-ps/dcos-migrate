@@ -3,6 +3,7 @@ from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret
 from kubernetes.client import ApiClient
 from random import randrange
 from .app_translator import ContainerDefaults, translate_app, Settings, clean_secret_key
+import logging
 
 
 class MarathonMigrator(Migrator):
@@ -16,8 +17,6 @@ class MarathonMigrator(Migrator):
         }
 
         self.secret = None
-        self.appid = ""
-        self.appid_annotation = "migrate.dcos.io/marathon/appid"
         self.manifest = None
 
     def translate_marathon(self, key, value, full_path):
@@ -48,17 +47,20 @@ class MarathonMigrator(Migrator):
             if clusterMeta:
                 metadata.annotations = clusterMeta.annotations
             appid = self.dnsify(self.object['id'])
-            metadata.annotations["migration.dcos.d2iq.com/marathon-appid"] = appid
+            metadata.annotations["migration.dcos.d2iq.com/marathon-appid"] = self.object['id']
             metadata.name = "marathonsecret-{}".format(appid)
             self.secret = V1Secret(metadata=metadata, data={})
             self.secret.api_version = 'v1'
             self.secret.kind = 'Secret'
 
-        sec = Manifest.renderManifestName(value['source'])
+        sec = clean_secret_key(value['source'])
 
         sourceSecret = self.manifest_list.manifest(
             pluginName='secret', manifestName=sec)
 
         if sourceSecret:
             for v in sourceSecret[0].data.values():
-                self.secret.data[key] = v
+                self.secret.data[sec] = v
+        else:
+            logging.warning("Source secret '{}' not found".format(
+                sec))

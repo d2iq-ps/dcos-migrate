@@ -76,13 +76,13 @@ class StorableList(list):
 
             pluginName = pluginFile[0]
             fileName = pluginFile[1].split('.')
-            if not len(fileName) == 3:
+            if not len(fileName) >= 3:
                 raise ValueError(
                     "Unexpected file name: {} in {}".format(f, fileName))
 
-            name = fileName[0]
-            className = fileName[1]
-            extension = fileName[2]
+            name = ".".join(fileName[:-2])
+            className = fileName[-2]
+            extension = fileName[-1]
 
             data = ""
             with open(f, 'rt') as file:

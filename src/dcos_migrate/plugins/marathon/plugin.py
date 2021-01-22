@@ -10,7 +10,7 @@ class MarathonPlugin(MigratePlugin):
     """docstring for MarathonPlugin."""
 
     plugin_name = "marathon"
-    depends_migrate = [ClusterPlugin.plugin_name, SecretPlugin.plugin_name]
+    migrate_depends = [ClusterPlugin.plugin_name, SecretPlugin.plugin_name]
 
     def __init__(self):
         super(MarathonPlugin, self).__init__()

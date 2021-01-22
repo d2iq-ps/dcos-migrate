@@ -33,8 +33,13 @@ class Migrator(object):
         # `folder/sec!ret` becomes `folder.sec_ret`
         return self._invalid_secret_key.sub("_", s).lstrip(".")
 
-    def dnsify(self, name):
-        new_name = re.sub("[^a-z0-9-]+", "-", name.lower())
+    def dnsify(self, name: str):
+        _invalid_secret_key = re.compile('[^-._a-zA-Z0-9]')
+        # Replace DC/OS folders with dots
+        new_name = ".".join(list(filter(None, name.split("/"))))
+        # Replace other invalid characters with `_`
+        # `folder/sec!ret` becomes `folder.sec_ret`
+        new_name = _invalid_secret_key.sub('_', new_name)
         if not name == new_name:
             logging.info(
                 f'"{name}" is not a valid name in kubernetes. converted it to "{new_name}".'

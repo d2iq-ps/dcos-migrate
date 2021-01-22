@@ -1,7 +1,7 @@
 import yaml
 import logging
 import inspect
-
+import re
 from kubernetes.client import ApiClient
 import kubernetes.client.models
 
@@ -93,8 +93,12 @@ class Manifest(list):
 
     @staticmethod
     def renderManifestName(name: str) -> str:
-        # replace path with dashes
-        return "-".join(list(filter(None, name.split("/"))))
+        _invalid_secret_key = re.compile('[^-._a-zA-Z0-9]')
+        # Replace DC/OS folders with dots
+        name = ".".join(filter(None, name.split("/")))
+        # Replace other invalid characters with `_`
+        # `folder/sec!ret` becomes `folder.sec_ret`
+        return _invalid_secret_key.sub('_', name)
 
     @classmethod
     def genModelName(self, apiVersion: str, kind: str):
