@@ -48,7 +48,7 @@ class MarathonMigrator(Migrator):
             if clusterMeta:
                 metadata.annotations = clusterMeta.annotations
             appid = self.dnsify(self.object['id'])
-            metadata.annotations["migration.dcos.d2iq.com/marathon-appid"] = self.object['id']
+            metadata.annotations[utils.namespace_path("marathon-appid")] = self.object['id']
             metadata.name = "marathonsecret-{}".format(appid)
             self.secret = V1Secret(metadata=metadata, data={})
             self.secret.api_version = 'v1'

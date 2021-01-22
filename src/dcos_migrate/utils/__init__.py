@@ -1,1 +1,1 @@
-from .naming import dnsify
+from .naming import dnsify, namespace_path
