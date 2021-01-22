@@ -91,15 +91,6 @@ class Manifest(list):
 
             self.append(ds)
 
-    @staticmethod
-    def renderManifestName(name: str) -> str:
-        _invalid_secret_key = re.compile('[^-._a-zA-Z0-9]')
-        # Replace DC/OS folders with dots
-        name = ".".join(list(filter(None, name.split("/"))))
-        # Replace other invalid characters with `_`
-        # `folder/sec!ret` becomes `folder.sec_ret`
-        return _invalid_secret_key.sub('_', name)
-
     @classmethod
     def genModelName(self, apiVersion: str, kind: str):
         apiv = apiVersion.split("/")[-1]

@@ -1,8 +1,9 @@
 from dcos_migrate.system import Migrator, Manifest
+import dcos_migrate.utils as utils
 from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret
 from kubernetes.client import ApiClient
 from random import randrange
-from .app_translator import ContainerDefaults, translate_app, Settings, clean_secret_key
+from .app_translator import ContainerDefaults, translate_app, Settings
 import logging
 
 
@@ -53,7 +54,7 @@ class MarathonMigrator(Migrator):
             self.secret.api_version = 'v1'
             self.secret.kind = 'Secret'
 
-        sec = clean_secret_key(value['source'])
+        sec = utils.dnsify(value['source'])
 
         sourceSecret = self.manifest_list.manifest(
             pluginName='secret', manifestName=sec)
