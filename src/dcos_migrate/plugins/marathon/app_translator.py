@@ -94,7 +94,7 @@ class AdditionalFlagNeeded(Exception):
 def clean_secret_key(key: str) -> str:
     _invalid_secret_key = re.compile('[^-._a-zA-Z0-9]')
     # Replace DC/OS folders with dots
-    key = key.replace('/', '.')
+    key = ".".join(list(filter(None, key.split("/"))))
     # Replace other invalid characters with `_`
     # `folder/sec!ret` becomes `folder.sec_ret`
     return _invalid_secret_key.sub('_', key)

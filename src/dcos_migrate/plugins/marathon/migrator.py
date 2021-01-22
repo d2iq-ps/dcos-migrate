@@ -3,6 +3,7 @@ from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret
 from kubernetes.client import ApiClient
 from random import randrange
 from .app_translator import ContainerDefaults, translate_app, Settings, clean_secret_key
+import logging
 
 
 class MarathonMigrator(Migrator):
@@ -62,3 +63,6 @@ class MarathonMigrator(Migrator):
         if sourceSecret:
             for v in sourceSecret[0].data.values():
                 self.secret.data[sec] = v
+        else:
+            logging.warning("Source secret '{}' not found".format(
+                sec))
