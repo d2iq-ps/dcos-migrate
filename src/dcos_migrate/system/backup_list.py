@@ -1,6 +1,6 @@
 from .storable_list import StorableList
 from .backup import Backup
-from jsonpath_ng import parse
+from jsonpath_ng import parse  # type: ignore
 
 
 class BackupList(StorableList):
@@ -37,9 +37,10 @@ class BackupList(StorableList):
 
         return bl
 
-    def append_data(self, pluginName: str, backupName: str,
-                    extenstion: str, data: str):
+    def append_data(self, pluginName: str, backupName: str,  # type: ignore
+                    extension: str, data: str):
         b = Backup(pluginName=pluginName, backupName=backupName,
-                   extenstion=extenstion).deserialize(data)
+                   extension=extension)
+        b.deserialize(data)
 
         self.append(b)

@@ -3,7 +3,7 @@ from dcos_migrate.plugins.cluster import ClusterPlugin
 from dcos_migrate.system import DCOSClient, BackupList, Backup, Manifest, ManifestList
 import dcos_migrate.utils as utils
 
-from kubernetes.client.models import V1Secret, V1ObjectMeta
+from kubernetes.client.models import V1Secret, V1ObjectMeta  # type: ignore
 
 import urllib
 import base64
@@ -81,7 +81,7 @@ class SecretPlugin(MigratePlugin):
     def __init__(self):
         super(SecretPlugin, self).__init__()
 
-    def backup(self, client: DCOSClient, **kwargs) -> BackupList:
+    def backup(self, client: DCOSClient, **kwargs) -> BackupList:  # type: ignore
         backupList = BackupList()
         sec = DCOSSecretsService(client)
         path = ""
@@ -91,7 +91,7 @@ class SecretPlugin(MigratePlugin):
                 secData = sec.get(path, key)
 
                 backupList.append(
-                    Backup(self.plugin_name, Backup.renderBackupName(path+key), data=secData))
+                    Backup(self.plugin_name, Backup.renderBackupName(path + key), data=secData))
 
         return backupList
 

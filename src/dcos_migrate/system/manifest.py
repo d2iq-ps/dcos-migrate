@@ -1,9 +1,8 @@
 import yaml
 import logging
 import inspect
-import re
-from kubernetes.client import ApiClient
-import kubernetes.client.models
+from kubernetes.client import ApiClient  # type: ignore
+import kubernetes.client.models  # type: ignore
 
 
 class Manifest(list):
@@ -18,7 +17,7 @@ class Manifest(list):
         self._serializer = self.dumps
         self._deserializer = yaml.safe_load_all
 
-        self.resources = []
+        self.resources = []  # type: ignore
 
     def dumps(self, data) -> str:
         docs = []
@@ -35,7 +34,7 @@ class Manifest(list):
             logging.debug("Found doc: {}".format(document))
             docs.append(document)
 
-        return "---\n"+'\n---\n'.join(docs)
+        return "---\n" + '\n---\n'.join(docs)
 
     @property
     def name(self):

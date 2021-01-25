@@ -26,7 +26,7 @@ class DCOSMigrate(object):
             len(self.pm.backup_batch)))
         for batch in self.pm.backup_batch:
             # each batch could also be executed in parallel.
-            # But for not just start sequencial
+            # But for now just start sequential
             for plugin in batch:
                 logging.info(
                     "Calling backup for plugin {}".format(plugin.plugin_name))

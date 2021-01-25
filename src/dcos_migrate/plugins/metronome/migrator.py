@@ -1,5 +1,8 @@
 from dcos_migrate.system import Migrator, Manifest
-from kubernetes.client.models import V1beta1CronJob, V1beta1CronJobSpec, V1beta1JobTemplateSpec, V1JobSpec, V1ObjectMeta, V1PodSpec, V1Container, V1ResourceRequirements
+from kubernetes.client.models import (  # type: ignore
+    V1beta1CronJob, V1beta1CronJobSpec, V1beta1JobTemplateSpec, V1JobSpec,
+    V1ObjectMeta, V1PodSpec, V1Container, V1ResourceRequirements
+)
 import logging
 
 
