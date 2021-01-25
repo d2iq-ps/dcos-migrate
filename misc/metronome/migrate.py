@@ -402,7 +402,7 @@ def translate(json_spec, args={}):
             )
         plain_job["spec"]["template"]["spec"]["containers"][0]["image"] = args.image
 
-    if args.get("force_cronjob") or any(schedule_props) > 0:
+    if args.force_cronjob or any(schedule_props) > 0:
         cron_job = {
             "apiVersion": "batch/v1beta1",
             "kind": "CronJob",
@@ -462,7 +462,7 @@ def main():
     )
     translate_cmd.add_argument(
         "--force-cronjob",
-        type=bool,
+        action="store_true",
         help="Generate a CronJob, even if the source spec has no schedule specified. This might be helpful in the cases where you want to manually trigger JobRuns as you can't rerun a K8s-Job.",
     )
     translate_cmd.add_argument(
