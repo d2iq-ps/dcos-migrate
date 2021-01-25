@@ -1,15 +1,20 @@
 import json
 import logging
-import re
 import os.path
 
+from collections import namedtuple
+from typing import List, Mapping, Union
 
 import dcos_migrate.utils as utils
 
-from collections import namedtuple
+from .app_secrets import AppSecretMapping, MonolithicAppSecretMapping
+
+from .common import pod_spec_update, main_container, try_oneline_dump
+from .common import InvalidAppDefinition, AdditionalFlagNeeded
 
 from .mapping_utils import Translated, apply_mapping
 from .mapping_utils import ListExtension, finalize_unmerged_list_extensions
+from .volumes import translate_volumes
 
 
 Settings = namedtuple('Settings', ['container_defaults', 'imported_k8s_secret_name'])
@@ -17,19 +22,6 @@ Settings = namedtuple('Settings', ['container_defaults', 'imported_k8s_secret_na
 ContainerDefaults = namedtuple('ContainerDefaults', ['image', 'working_dir'])
 
 log = logging.getLogger(__name__) #pylint: disable=invalid-name
-
-
-def pod_spec_update(fields):
-    return {'spec': {'template': {'spec': fields}}}
-
-
-def main_container(fields):
-    # NOTE: All updates for the main container set the same "name" field.
-    assert 'name' not in fields
-    _fields = {'name': 'main'}
-    _fields.update(fields)
-
-    return pod_spec_update({'containers': [_fields]})
 
 
 def translate_container_command(fields):
@@ -82,51 +74,33 @@ def translate_resources(fields):
     return Translated(update)
 
 
-class MissingSecretSource(Exception):
-    pass
-
-class AdditionalFlagNeeded(Exception):
-    """
-    Used to indicate that for migrating this specific app the user is obliged
-    to specify a flag which could otherwise have been omitted.
-    """
-    pass
-
-
-
-def translate_env(fields, imported_k8s_secret_name, error_location):
-    secrets = fields.get('secrets', {})
-
-    def translate_secret(secret):
-        try:
-            key = secrets[secret]['source']
-        except KeyError:
-            raise MissingSecretSource(
-                '{} is broken: source for an env secret "{}" not specified'.format(
-                    error_location, secret))
-
-        if not imported_k8s_secret_name:
-            raise AdditionalFlagNeeded(
-                '{} app is using secrets; please specify the'
-                ' `--imported-k8s-secret-name` and run again'.format(error_location))
-
-        return {
-            'secretKeyRef': {'name': imported_k8s_secret_name, 'key': utils.dnsify(key)}
-        }
-
-
-    translated = []
+def translate_env(
+        env: Mapping[str, Union[dict, str]],
+        app_secret_mapping: AppSecretMapping,
+    ):
+    translated: List[dict] = []
     not_translated = {}
 
     # FIXME: Sanitize against DCOS-specific stuff.
-    for var, value in fields.get('env', {}).items():
-        if isinstance(value, dict):
-            if value.keys() != {'secret'}:
-                not_translated[var] = value
-            else:
-                translated.append({"name": var, "valueFrom": translate_secret(value['secret'])})
-        else:
+    for var, value in env.items():
+        if isinstance(value, str):
             translated.append({"name": var, "value": value})
+            continue
+
+        if value.keys() != {'secret'}:
+            not_translated[var] = value
+            continue
+        ref = app_secret_mapping.get_reference(value['secret'])
+
+        translated.append({
+            "name": var,
+            "valueFrom": {
+                'secretKeyRef': {
+                    'name': ref.secret_name,
+                    'key': ref.key,
+                },
+            },
+        })
 
     return Translated(
         update=main_container({'env': translated}),
@@ -150,10 +124,6 @@ def translate_multitenancy(fields):
             'selector': {'matchLabels': selector_labels},
             'template': {'metadata': {'labels': selector_labels}}}
     })
-
-
-class InvalidAppDefinition(Exception):
-    pass
 
 
 def get_network_probe_builder(get_port_by_index):
@@ -284,10 +254,6 @@ def not_translatable(_):
     return Translated(warnings=["field not translatable"])
 
 
-def try_oneline_dump(obj):
-    dump = json.dumps(obj)
-    return dump if len(dump) <= 78 else json.dumps(obj, indent=2)
-
 
 def skip_if_equals(default):
     if not default:
@@ -301,7 +267,11 @@ def skip_if_equals(default):
         )])
 
 
-def generate_root_mapping(settings: Settings, error_location):
+def generate_root_mapping(
+        container_defaults: ContainerDefaults,
+        app_secrets_mapping: AppSecretMapping,
+        error_location: str,
+    ):
 
     return {
         ('args', 'cmd'): translate_container_command,
@@ -312,7 +282,7 @@ def generate_root_mapping(settings: Settings, error_location):
         'constraints': skip_if_equals([]),
 
         ('container',):
-            get_container_translator(settings.container_defaults, error_location),
+            get_container_translator(container_defaults, app_secrets_mapping, error_location),
 
         ('cpus', 'mem', 'disk', 'gpus', 'resourceLimits'): translate_resources,
 
@@ -320,13 +290,11 @@ def generate_root_mapping(settings: Settings, error_location):
 
         'deployments': skip_quietly,
 
-        ('env', 'secrets'):
-            lambda fields: translate_env(fields, settings.imported_k8s_secret_name, error_location),
+        'env': lambda env: translate_env(env, app_secrets_mapping),
 
         'executor': skip_if_equals(""),
 
-        'fetch':
-            lambda fetches: translate_fetch(fetches, settings.container_defaults, error_location),
+        'fetch': lambda fetches: translate_fetch(fetches, container_defaults, error_location),
 
         ('healthChecks', 'container', 'portDefinitions'):
             lambda fields: translate_health_checks(fields, error_location),
@@ -345,6 +313,9 @@ def generate_root_mapping(settings: Settings, error_location):
             skip_if_equals({}),  # translate_networking,
 
         'residency': skip_if_equals({}),
+
+        # 'secrets' do not map to anything and are used only in combination with other fields.
+        'secrets': skip_quietly,
 
         'taskKillGracePeriodSeconds': not_translatable,
 
@@ -441,7 +412,11 @@ def translate_fetch(fetches, defaults: ContainerDefaults, error_location):
     )
 
 
-def get_container_translator(defaults: ContainerDefaults, error_location):
+def get_container_translator(
+        defaults: ContainerDefaults,
+        app_secret_mapping: AppSecretMapping,
+        error_location: str,
+    ):
     def translate_image(image_fields):
         if 'docker.image' in image_fields:
             return Translated(main_container({'image': image_fields['docker.image']}))
@@ -460,48 +435,6 @@ def get_container_translator(defaults: ContainerDefaults, error_location):
             container_update['workingDir'] = defaults.working_dir
         return Translated(main_container(container_update))
 
-    def translate_volume(volume, name) -> Translated:
-        def untranslatable():
-            return Translated(warnings=[
-                "Cannot translate a volume: {}".format(try_oneline_dump(volume))])
-
-        fields = volume.copy()
-        try:
-            container_path = fields.pop('containerPath')
-            host_path = fields.pop('hostPath')
-            mode = fields.pop('mode')
-        except KeyError:
-            return untranslatable()
-
-        if fields:
-            return untranslatable()
-
-        if not host_path.startswith('/'):
-            return untranslatable()
-
-        if mode not in ("RO", "RW"):
-            raise InvalidAppDefinition("Invalid mode {} in {}".format(mode, error_location))
-
-        mount = Translated(main_container({"volumeMounts": ListExtension([{
-            "name": name,
-            "mountPath": container_path,
-            "readOnly": mode == "RO",
-        }])}))
-
-        pod_volume = Translated(pod_spec_update({"volumes": ListExtension([{
-            "name": name,
-            "hostPath": {"path": host_path}
-        }])}))
-
-        return mount.merged_with(pod_volume)
-
-    def translate_volumes(volumes):
-        result = Translated()
-        for index, volume in enumerate(volumes):
-            translated = translate_volume(volume, 'volume-{}'.format(index))
-            result = result.merged_with(translated)
-        return result
-
     def translate_container(fields):
         update, warnings = apply_mapping(
             mapping={
@@ -515,7 +448,7 @@ def get_container_translator(defaults: ContainerDefaults, error_location):
                 "docker.pullConfig.secret": skip_if_equals({}),
                 "linuxInfo": skip_if_equals({}),
                 "portMappings": skip_if_equals({}),
-                "volumes": translate_volumes,
+                "volumes": lambda _: translate_volumes(_, app_secret_mapping),
                 "type": skip_quietly,
             },
             data=flatten(fields.get('container', {})),
@@ -569,7 +502,11 @@ def load(path: str):
 def translate_app(app: dict, settings: Settings):
     error_location = "app " + app.get('id', '(NO ID)')
 
-    mapping = generate_root_mapping(settings, error_location)
+    mapping = generate_root_mapping(
+        settings.container_defaults,
+        MonolithicAppSecretMapping(app, settings.imported_k8s_secret_name),
+        error_location,
+    )
 
     try:
         definition, warnings = apply_mapping(mapping, app, error_location)
