@@ -1,8 +1,9 @@
 import pytest
 import requests_mock
 import base64
+import json
 from dcos import config
-from dcos_migrate.system.client import DCOSClient
+from dcos_migrate.system import DCOSClient, ManifestList, BackupList, Backup
 from dcos_migrate.plugins.secret import SecretPlugin
 
 
@@ -42,3 +43,19 @@ def test_secret_backup(conf, **kwargs):
     assert len(backup) == 1
     assert backup[0].data['value'] == base64.b64encode(
         "21a692c6286114e51e28510242eafc4010c46fe0".encode('utf-8')).decode('ascii')
+
+
+def test_secret_migrate():
+    with open('tests/examples/simpleSecret.json') as json_file:
+        data = json.load(json_file)
+
+        assert data['key'] is not None
+
+        bl = BackupList()
+        bl.append(Backup(pluginName='secret', backupName='foo.bar', data=data))
+
+        s = SecretPlugin()
+
+        ml = s.migrate(backupList=bl, manifestList=ManifestList())
+
+        assert len(ml) == 1

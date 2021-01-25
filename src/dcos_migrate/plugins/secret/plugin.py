@@ -100,6 +100,7 @@ class SecretPlugin(MigratePlugin):
 
         for ba in backupList.backups(pluginName='secret'):
             metadata = V1ObjectMeta()
+            metadata.annotations = {}
 
             clusterMeta = manifestList.clusterMeta()
             if clusterMeta:
@@ -110,7 +111,8 @@ class SecretPlugin(MigratePlugin):
             fullPath = "/".join(filter(None, [b["path"], b["key"]]))
             name = utils.dnsify(b["key"])
 
-            metadata.annotations[utils.namespace_path("secrets/secretpath")] = fullPath
+            metadata.annotations[utils.namespace_path(
+                "secrets/secretpath")] = fullPath
             metadata.name = name
             sec = V1Secret(metadata=metadata)
             sec.api_version = 'v1'
@@ -120,7 +122,7 @@ class SecretPlugin(MigratePlugin):
                     b['value'].encode('ascii')).decode('ascii')
 
             manifest = Manifest(pluginName=self.plugin_name,
-                                manifestName=Manifest.renderManifestName(fullPath))
+                                manifestName=utils.dnsify(fullPath))
             manifest.append(sec)
 
             ml.append(manifest)
