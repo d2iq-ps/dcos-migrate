@@ -1,14 +1,15 @@
+from typing import List
 from dcos_migrate.system import DCOSClient, BackupList, ManifestList
 
 
 class MigratePlugin(object):
     """docstring for Migrator."""
-    plugin_name = None
-    backup_depends = []
-    backup_data_depends = []
-    migrate_depends = []
-    migrate_data_depends = []
-    config_options = []
+    plugin_name: str = 'OVERRIDE'
+    backup_depends: List[str] = []
+    backup_data_depends: List[str] = []
+    migrate_depends: List[str] = []
+    migrate_data_depends: List[str] = []
+    config_options: List = []
 
     def __init__(self, config={}):
         self.plugin_config = config

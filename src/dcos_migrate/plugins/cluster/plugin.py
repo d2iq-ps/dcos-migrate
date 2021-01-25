@@ -1,7 +1,7 @@
 from dcos_migrate.plugins.plugin import MigratePlugin
 from dcos_migrate.system import BackupList, DCOSClient, Backup, Manifest, ManifestList
 import dcos_migrate.utils as utils
-from kubernetes.client.models import V1ConfigMap, V1ObjectMeta
+from kubernetes.client.models import V1ConfigMap, V1ObjectMeta  # type: ignore
 import json
 import logging
 import datetime

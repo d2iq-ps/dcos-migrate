@@ -1,10 +1,11 @@
 import json
+from typing import Dict
 
 
 class Backup(object):
     """docstring for Backup."""
 
-    def __init__(self, pluginName: str, backupName: str, data={}, extension='json'):
+    def __init__(self, pluginName: str, backupName: str, data: Dict = {}, extension: str = 'json'):
         super(Backup, self).__init__()
         self._plugin_name = pluginName
         if "/" in backupName:
@@ -34,11 +35,11 @@ class Backup(object):
         return self._extension
 
     @property
-    def data(self) -> object:
+    def data(self) -> Dict:
         return self._data
 
     def serialize(self) -> str:
         return self._serializer(self._data)
 
-    def deserialize(self, data: str) -> object:
+    def deserialize(self, data: str) -> None:
         self._data = self._deserializer(data)

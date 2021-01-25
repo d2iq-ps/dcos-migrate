@@ -1,5 +1,6 @@
 import os
 import glob
+from typing import Union
 from .backup import Backup
 from .manifest import Manifest
 import logging
@@ -30,7 +31,7 @@ class StorableList(list):
                 cls=b.__class__.__name__, ext=b.extension)
 
             path = os.path.join(self._path, pname)
-            filepath = os.path.join(path, bname+fextension)
+            filepath = os.path.join(path, bname + fextension)
 
             data = b.serialize()
 
@@ -49,17 +50,14 @@ class StorableList(list):
     def append_data(self, pluginName: str, backupName: str, extension: str,
                     className: str, data: str, **kwargs):
         # list classes should implement this. Now we do a static guess
-        cls = None
+        d: Union[Backup, Manifest]
         if className == "Backup":
-            cls = Backup
-        if className == "Manifest":
-            cls = Manifest
-
-        if not cls:
+            d = Backup(pluginName=pluginName, backupName=backupName, extension=extension, **kwargs)
+        elif className == "Manifest":
+            d = Manifest(pluginName=pluginName, extension=extension, **kwargs)
+        else:
             raise ValueError("Unknown class: {}".format(className))
 
-        d = cls(pluginName=pluginName, backupName=backupName,
-                extension=extension, **kwargs)
         d.deserialize(data)
         self.append(d)
 

@@ -1,6 +1,6 @@
 import abc
 from collections import defaultdict
-from typing import List
+from typing import List, Mapping
 
 from .app_secrets import AppSecretMapping
 from .common import InvalidAppDefinition, main_container, pod_spec_update, try_oneline_dump
@@ -99,7 +99,7 @@ class _SecretVolumeMapper(_VolumeMapper):
         # We do not expect that AppSecretMapping returns the same K8s secret
         # name for all the secrets in the app. Hence, to generate secret volumes,
         # we store a list of used keys for each k8s secret.
-        self._used_secret_keys: Mapping[str: List[str]] = defaultdict(list)
+        self._used_secret_keys: Mapping[str, List[str]] = defaultdict(list)
 
     @staticmethod
     def secret_volume_name(k8s_secret_name: str) -> str:

@@ -1,8 +1,7 @@
 from dcos_migrate.system import Migrator, Manifest
 import dcos_migrate.utils as utils
-from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret
-from kubernetes.client import ApiClient
-from random import randrange
+from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret  # type: ignore
+from kubernetes.client import ApiClient  # type: ignore
 from .app_translator import ContainerDefaults, translate_app, Settings
 import logging
 
