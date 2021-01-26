@@ -85,6 +85,8 @@ class DictArg(Arg):
         super(DictArg, self).__init__(name, **kwargs)
 
         self._nargs = '*'
+        if not self._metavar:
+            self._metavar = "KEY=VALUE"
 
     def get_result(self, namespace: argparse.Namespace) -> Dict[str, Any]:
         res = {}
@@ -109,7 +111,8 @@ class ArgParse(object):
         self._parser = parser
         if not parser:
             self._parser = argparse.ArgumentParser(
-                prog=prog, usage=usage, epilog=epilog)
+                prog=prog, usage=usage, epilog=epilog,
+                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         self.add_args()
 
@@ -122,7 +125,8 @@ class ArgParse(object):
             a.add_argument(self._parser)
 
     def parse_args(self, args: list) -> Dict[str, Any]:
-        parsed_args = self.parser.parse_known_args(args)[0]
+        parsed_args = self.parser.parse_args(args)[0]
+
         options: Dict[str, Any] = {}
 
         for a in self.args:
