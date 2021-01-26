@@ -1,4 +1,5 @@
 import argparse
+from typing import Dict, Any
 
 
 class Arg(object):
@@ -116,9 +117,9 @@ class ArgParse(object):
         for a in self.args:
             a.add_argument(self._parser)
 
-    def parse_args(self, args: list) -> dict:
+    def parse_args(self, args: list) -> Dict[str, Any]:
         parsed_args = self.parser.parse_known_args(args)[0]
-        options = {}
+        options: Dict[str, Any] = {}
 
         for a in self.args:
             pname = "global"
