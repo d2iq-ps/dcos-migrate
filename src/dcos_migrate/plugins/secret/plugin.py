@@ -3,7 +3,7 @@ from dcos_migrate.plugins.cluster import ClusterPlugin
 from dcos_migrate.system import DCOSClient, BackupList, Backup, Manifest, ManifestList
 import dcos_migrate.utils as utils
 
-from kubernetes.client.models import V1Secret, V1ObjectMeta
+from kubernetes.client.models import V1Secret, V1ObjectMeta  # type: ignore
 
 import urllib
 import base64
@@ -81,7 +81,7 @@ class SecretPlugin(MigratePlugin):
     def __init__(self):
         super(SecretPlugin, self).__init__()
 
-    def backup(self, client: DCOSClient, **kwargs) -> BackupList:
+    def backup(self, client: DCOSClient, **kwargs) -> BackupList:  # type: ignore
         backupList = BackupList()
         sec = DCOSSecretsService(client)
         path = ""
@@ -91,7 +91,7 @@ class SecretPlugin(MigratePlugin):
                 secData = sec.get(path, key)
 
                 backupList.append(
-                    Backup(self.plugin_name, Backup.renderBackupName(path+key), data=secData))
+                    Backup(self.plugin_name, Backup.renderBackupName(path + key), data=secData))
 
         return backupList
 
@@ -100,6 +100,7 @@ class SecretPlugin(MigratePlugin):
 
         for ba in backupList.backups(pluginName='secret'):
             metadata = V1ObjectMeta()
+            metadata.annotations = {}
 
             clusterMeta = manifestList.clusterMeta()
             if clusterMeta:
@@ -110,7 +111,8 @@ class SecretPlugin(MigratePlugin):
             fullPath = "/".join(filter(None, [b["path"], b["key"]]))
             name = utils.dnsify(b["key"])
 
-            metadata.annotations[utils.namespace_path("secrets/secretpath")] = fullPath
+            metadata.annotations[utils.namespace_path(
+                "secrets/secretpath")] = fullPath
             metadata.name = name
             sec = V1Secret(metadata=metadata)
             sec.api_version = 'v1'
@@ -120,7 +122,7 @@ class SecretPlugin(MigratePlugin):
                     b['value'].encode('ascii')).decode('ascii')
 
             manifest = Manifest(pluginName=self.plugin_name,
-                                manifestName=Manifest.renderManifestName(fullPath))
+                                manifestName=utils.dnsify(fullPath))
             manifest.append(sec)
 
             ml.append(manifest)

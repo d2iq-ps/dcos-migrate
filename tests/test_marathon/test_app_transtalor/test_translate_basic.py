@@ -101,3 +101,17 @@ def test_translates_args():
 
     assert(not "command" in container)
     assert(container['args'] == ["args", "passed", "to", "entrypoint"])
+
+
+def test_env_secret():
+    settings = new_settings()
+    app = {
+        "id":"app",
+        "env": {"FOO": {"secret": "bar"}},
+        "secrets": {"bar": {"source": "/deadbeef/baz"}},
+    }
+
+    result, _ = app_translator.translate_app(app, settings)
+    env = result['spec']['template']['spec']['containers'][0]['env']
+
+    assert env == [{'name': 'FOO', 'valueFrom': {'secretKeyRef': {'name': 'dummy', 'key': 'deadbeef.baz'}}}]

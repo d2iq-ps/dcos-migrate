@@ -15,7 +15,7 @@ class MetronomePlugin(MigratePlugin):
     def __init__(self):
         super(MetronomePlugin, self).__init__()
 
-    def backup(self, client: DCOSClient, **kwargs) -> BackupList:
+    def backup(self, client: DCOSClient, **kwargs) -> BackupList:  # type: ignore
         bl = BackupList()
         jobs = client.get(
             "{}/service/metronome/v1/jobs".format(client.dcos_url)).json()

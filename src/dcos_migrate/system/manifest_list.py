@@ -1,6 +1,6 @@
 from .storable_list import StorableList
 from .manifest import Manifest
-from kubernetes.client.models import V1ObjectMeta
+from kubernetes.client.models import V1ObjectMeta  # type: ignore
 import copy
 
 
@@ -36,7 +36,7 @@ class ManifestList(StorableList):
 
         return ml
 
-    def append_data(self, pluginName: str, backupName: str,
+    def append_data(self, pluginName: str, backupName: str,  # type: ignore
                     extension: str, data: str, **kw):
         b = Manifest(pluginName=pluginName, manifestName=backupName,
                      extension=extension)

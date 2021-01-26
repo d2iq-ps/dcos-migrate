@@ -1,4 +1,4 @@
-from dcos import http, config
+from dcos import http, config  # type: ignore
 from urllib.parse import urlparse
 
 

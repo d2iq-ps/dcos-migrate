@@ -54,6 +54,8 @@ your main call might provide a default image to fall back to as well as a secret
  ./migrate.py translate --image busybox --imported-k8s-secret-name my-secret --working-dir /app $f > "dkp-jobs/$(basename "$f" .json).yaml"
 ```
 
+you might also want to specify `--force-cronjob` to always produce a `CronJob`, as that's closer to a DC/OS job because it can be ran more than once.
+
 
 ### Evaluate the results
 

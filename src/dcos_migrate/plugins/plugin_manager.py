@@ -2,17 +2,26 @@ import importlib
 import pkgutil
 import inspect
 import logging
+from typing import Dict, List
+
 import dcos_migrate.plugins
+from dcos_migrate.plugins.plugin import MigratePlugin
 
 
-def is_plugin(object):
-    return (inspect.isclass(object)
-            and issubclass(object, dcos_migrate.plugins.plugin.MigratePlugin)
-            and object.plugin_name is not None)
+def is_plugin(obj):
+    return (
+        inspect.isclass(obj)
+        and issubclass(obj, MigratePlugin)
+        and obj.plugin_name is not None
+    )
 
 
-def get_dependency_batches(plugins, depattr):
+def get_dependency_batches(
+    plugins: Dict[str, MigratePlugin], depattr: str
+) -> List[List[MigratePlugin]]:
     """
+    Return a list of lists of plugins. The plugins in the first list must be run
+    before the plugins in the second list, and so on, for each list.
     [
         [ Plugin, PlugIn ],
         [ Plugin ],
@@ -25,23 +34,26 @@ def get_dependency_batches(plugins, depattr):
     for p in plugins.values():
         p_deps[p.plugin_name] = set(getattr(p, depattr))
 
+    # `p_deps` is now a dictionary mapping each plugin names to the set of
+    # plugins that are required to run before it.
+
     while p_deps:
-        nodeps = []
-        for name, deps in p_deps.items():
-            if not deps:
-                nodeps.append(name)
+        # Create a list of plugins that have no further dependencies.
+        nodeps = [name for name, deps in p_deps.items() if not deps]
 
         if not nodeps:
             raise ValueError("Circular plugin dependency")
 
+        # Delete collected plugins from `p_deps` (must be done outside iteration).
         for name in nodeps:
             del p_deps[name]
+
+        # Remove collected plugins from remaining plugin dependencies.
         for deps in p_deps.values():
             deps.difference_update(nodeps)
 
-        batch = []
-        for name in nodeps:
-            batch.append(plugins[name])
+        # Create the next batch of plugins.
+        batch = [plugins[name] for name in nodeps]
 
         batches.append(batch)
 

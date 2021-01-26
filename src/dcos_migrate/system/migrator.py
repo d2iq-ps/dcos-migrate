@@ -1,7 +1,7 @@
-import json
 import logging
-from jsonpath_ng.ext import parse
-from dcos_migrate.system import ManifestList, BackupList, Backup, Manifest
+from jsonpath_ng.ext import parse  # type: ignore
+from typing import Optional
+from dcos_migrate.system import Manifest
 import dcos_migrate.utils as utils
 
 
@@ -32,7 +32,7 @@ class Migrator(object):
             )
         return new_name
 
-    def migrate(self) -> Manifest:
+    def migrate(self) -> Optional[Manifest]:
         if not self.valid():
             return None
 
