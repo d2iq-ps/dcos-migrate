@@ -46,7 +46,7 @@ class Arg(object):
         return self.arg.replace("-", "_")
 
     @ property
-    def arg_name(self):
+    def arg_name(self) -> str:
         return "--{}".format(self.arg)
 
     def add_argument(self, parser: argparse.ArgumentParser):
@@ -56,14 +56,14 @@ class Arg(object):
                             required=self._required, help=self._help,
                             metavar=self._metavar)
 
-    def get_result(self, namespace: argparse.Namespace):
+    def get_result(self, namespace: argparse.Namespace) -> Any:
         return getattr(namespace, self.attr_arg)
 
 
 class BoolArg(Arg):
     """docstring for BoolArg."""
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name: str, **kwargs: Any):
         super(BoolArg, self).__init__(name, **kwargs)
 
     def add_argument(self, parser: argparse.ArgumentParser):
@@ -81,12 +81,12 @@ class BoolArg(Arg):
 class DictArg(Arg):
     """docstring for BoolAr g."""
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name: str, **kwargs: Any):
         super(DictArg, self).__init__(name, **kwargs)
 
         self._nargs = '*'
 
-    def get_result(self, namespace: argparse.Namespace):
+    def get_result(self, namespace: argparse.Namespace) -> Dict[str, Any]:
         res = {}
         attr = getattr(namespace, self.attr_arg)
         for a in attr:
@@ -99,7 +99,11 @@ class DictArg(Arg):
 class ArgParse(object):
     """docstring for ArgParse."""
 
-    def __init__(self, args: list, prog='dcos_migrate', parser=None, usage='', epilog=''):
+    def __init__(self, args: list,
+                 prog: str = 'dcos_migrate',
+                 parser: argparse.ArgumentParser = None,
+                 usage: str = '',
+                 epilog: str = ''):
         super(ArgParse, self).__init__()
         self.args = args
         self._parser = parser
@@ -110,10 +114,10 @@ class ArgParse(object):
         self.add_args()
 
     @property
-    def parser(self):
+    def parser(self) -> argparse.ArgumentParser:
         return self._parser
 
-    def add_args(self):
+    def add_args(self) -> None:
         for a in self.args:
             a.add_argument(self._parser)
 
