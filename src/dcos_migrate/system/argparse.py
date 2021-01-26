@@ -1,5 +1,5 @@
 import argparse
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class Arg(object):
@@ -117,15 +117,17 @@ class ArgParse(object):
         self.add_args()
 
     @property
-    def parser(self) -> argparse.ArgumentParser:
+    def parser(self) -> Optional[argparse.ArgumentParser]:
         return self._parser
 
     def add_args(self) -> None:
         for a in self.args:
             a.add_argument(self._parser)
 
-    def parse_args(self, args: list) -> Dict[str, Any]:
-        parsed_args = self.parser.parse_args(args)[0]
+    def parse_args(self, args: list) -> Optional[Dict[str, Any]]:
+        if not self.parser:
+            return None
+        parsed_args = self.parser.parse_args(args)
 
         options: Dict[str, Any] = {}
 
