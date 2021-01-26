@@ -108,12 +108,16 @@ class ArgParse(object):
 
         self.add_args()
 
+    @property
+    def parser(self):
+        return self._parser
+
     def add_args(self):
         for a in self.args:
             a.add_argument(self._parser)
 
     def parse_args(self, args: list) -> dict:
-        parsed_args = self._parser.parse_known_args(args)[0]
+        parsed_args = self.parser.parse_known_args(args)[0]
         options = {}
 
         for a in self.args:
@@ -121,7 +125,7 @@ class ArgParse(object):
             if a.plugin_name:
                 pname = a.plugin_name
 
-            if not pname in options:
+            if pname not in options:
                 options[pname] = {}
 
             res = a.get_result(parsed_args)
