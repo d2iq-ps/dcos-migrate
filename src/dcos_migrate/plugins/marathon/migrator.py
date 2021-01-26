@@ -2,7 +2,10 @@ from dcos_migrate.system import Migrator, Manifest
 import dcos_migrate.utils as utils
 from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret  # type: ignore
 from kubernetes.client import ApiClient  # type: ignore
+
 from .app_translator import ContainerDefaults, translate_app, Settings
+from .app_secrets import MonolithicAppSecretMapping
+
 import logging
 
 
@@ -26,7 +29,10 @@ class MarathonMigrator(Migrator):
 
         settings = Settings(
             container_defaults=ContainerDefaults("alpine:latest", "/"),
-            imported_k8s_secret_name=secretName
+            app_secret_mapping=MonolithicAppSecretMapping(
+                app=self.object,
+                imported_k8s_secret_name=secretName,
+            ),
         )
 
         self.manifest = Manifest(

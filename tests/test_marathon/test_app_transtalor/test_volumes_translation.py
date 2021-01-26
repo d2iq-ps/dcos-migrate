@@ -1,6 +1,9 @@
 import pytest
 
 from dcos_migrate.plugins.marathon import app_translator
+from dcos_migrate.plugins.marathon.app_secrets import MonolithicAppSecretMapping
+
+from .common import DummyAppSecretMapping
 
 def test_host_path_volumes():
     settings = app_translator.Settings(
@@ -8,7 +11,7 @@ def test_host_path_volumes():
             image=None,
             working_dir=None,
         ),
-        imported_k8s_secret_name = "dummy"
+        app_secret_mapping=DummyAppSecretMapping(),
     )
 
     app = {
@@ -58,7 +61,7 @@ def test_host_path_volume_with_fetch():
             image=None,
             working_dir="/sandbox",
         ),
-        imported_k8s_secret_name = "dummy"
+        app_secret_mapping=DummyAppSecretMapping(),
     )
 
     app = {
@@ -93,11 +96,6 @@ def test_secret_volume_with_host_path():
     One of the main things covered is non-interference between
     generating secret and host path volumes.
     """
-    settings = app_translator.Settings(
-        app_translator.ContainerDefaults(image=None, working_dir=None),
-        imported_k8s_secret_name = "migrated"
-    )
-
     app = {
         "id": "app",
         "container": {
@@ -109,6 +107,11 @@ def test_secret_volume_with_host_path():
         },
         "secrets": {"foo": {"source": "bar"}},
     }
+
+    settings = app_translator.Settings(
+        app_translator.ContainerDefaults(image=None, working_dir=None),
+        app_secret_mapping=MonolithicAppSecretMapping(app=app, imported_k8s_secret_name="migrated"),
+    )
 
     result, warnings = app_translator.translate_app(app, settings)
 
@@ -139,11 +142,6 @@ def test_multiple_secret_volumes():
     One of the main things covered is non-interference between
     generating secret and host path volumes.
     """
-    settings = app_translator.Settings(
-        app_translator.ContainerDefaults(image=None, working_dir=None),
-        imported_k8s_secret_name = "migrated"
-    )
-
     app = {
         "id": "app",
         "container": {
@@ -160,6 +158,11 @@ def test_multiple_secret_volumes():
             "baz-secret": {"source": "baz"},
         },
     }
+
+    settings = app_translator.Settings(
+        app_translator.ContainerDefaults(image=None, working_dir=None),
+        app_secret_mapping=MonolithicAppSecretMapping(app=app, imported_k8s_secret_name="migrated"),
+    )
 
     result, warnings = app_translator.translate_app(app, settings)
 

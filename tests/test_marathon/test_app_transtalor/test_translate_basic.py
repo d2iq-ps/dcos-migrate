@@ -4,6 +4,10 @@ import sys
 import pytest
 
 from dcos_migrate.plugins.marathon import app_translator
+from dcos_migrate.plugins.marathon.app_secrets import MonolithicAppSecretMapping
+
+from .common import DummyAppSecretMapping
+
 
 def new_settings(image: str = "busybox"):
     return app_translator.Settings(
@@ -11,7 +15,7 @@ def new_settings(image: str = "busybox"):
             image=image,
             working_dir=".",
         ),
-        imported_k8s_secret_name = "dummy"
+        app_secret_mapping=DummyAppSecretMapping(),
     )
 
 
@@ -104,12 +108,17 @@ def test_translates_args():
 
 
 def test_env_secret():
-    settings = new_settings()
     app = {
         "id":"app",
         "env": {"FOO": {"secret": "bar"}},
         "secrets": {"bar": {"source": "/deadbeef/baz"}},
     }
+
+    settings = app_translator.Settings(
+        app_translator.ContainerDefaults(image="lazybox", working_dir=None),
+        app_secret_mapping=MonolithicAppSecretMapping(app=app, imported_k8s_secret_name="dummy"),
+    )
+
 
     result, _ = app_translator.translate_app(app, settings)
     env = result['spec']['template']['spec']['containers'][0]['env']
