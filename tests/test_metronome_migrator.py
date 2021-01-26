@@ -53,17 +53,15 @@ def snapshot_test(snapshot, source, target):
         data = json.load(f)
         ml = create_manifest_list_cluster()
         m = MetronomeMigrator(object=data, manifest_list=ml)
-        manifest = m.migrate()[0]
-        api = ApiClient()
-
-        assert manifest is not None
-        snapshot.assert_match(
-            yaml.dump(api.sanitize_for_serialization(manifest)), target
-        )
+        snapshot.assert_match(m.migrate().serialize(), target)
 
 
 ###############################################################################
 #                                    TESTS                                    #
 ###############################################################################
-def test_simple(snapshot):
-    snapshot_test(snapshot, "simpleJob.json", "simpleJob.yaml")
+def test_job(snapshot):
+    snapshot_test(snapshot, "job.json", "job.yaml")
+
+
+def test_ucr_job(snapshot):
+    snapshot_test(snapshot, "job_ucr.json", "job_ucr.yaml")

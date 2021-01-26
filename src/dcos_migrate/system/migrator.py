@@ -28,7 +28,7 @@ class Migrator(object):
         self.manifest_list = manifest_list
         self.manifest: Optional[Manifest] = None
 
-        self.translate: Dict[str, Callable[[str, str, str], None]] = {}
+        self.translate: Dict[str, Callable[[str, Any, str], None]] = {}
 
     def valid(self) -> bool:
         """Returns True if self.object is what we expect"""
