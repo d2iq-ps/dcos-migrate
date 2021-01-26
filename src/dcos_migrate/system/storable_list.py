@@ -1,27 +1,28 @@
 import os
 import glob
-from typing import Union
+from typing import Any, Dict, List, Optional, Union
 from .backup import Backup
 from .manifest import Manifest
 import logging
 # pre python 3.9
 
 
-def removeprefix(s: str, pre: str):
+def removeprefix(s: str, pre: str) -> str:
     if s.startswith(pre):
         return s[len(pre):]
     return s
 
 
-class StorableList(list):
+class StorableList(List[Union[Backup, Manifest]]):
     """docstring for StorableList."""
 
-    def __init__(self, path, dry=False):
-        super(StorableList, self).__init__()
+    def __init__(self, path: str, dry: bool = False):
         self._dry = dry
         self._path = path
 
-    def store(self, pluginName=None, backupName=None) -> object:
+    def store(
+        self, pluginName: Optional[str] = None, backupName: Optional[str] = None
+    ) -> Dict[str, str]:
         # ./data/backup/<pluginName>/<backupName>.<class>.<extension>
         out = {}
         for b in self:
@@ -48,7 +49,7 @@ class StorableList(list):
         return out
 
     def append_data(self, pluginName: str, backupName: str, extension: str,
-                    className: str, data: str, **kwargs):
+                    className: str, data: str, **kwargs: Any) -> None:
         # list classes should implement this. Now we do a static guess
         d: Union[Backup, Manifest]
         if className == "Backup":
@@ -61,7 +62,7 @@ class StorableList(list):
         d.deserialize(data)
         self.append(d)
 
-    def load(self):
+    def load(self) -> 'StorableList':
         # ./data/backup/<pluginName>/<backupName>.<class>.<extension>
         globstr = "{path}/*/*".format(path=self._path)
         for f in glob.glob(globstr):

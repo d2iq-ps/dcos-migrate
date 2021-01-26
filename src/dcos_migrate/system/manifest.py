@@ -1,15 +1,17 @@
 import yaml
 import logging
 import inspect
+from typing import Any, List, Optional
 from kubernetes.client import ApiClient  # type: ignore
 import kubernetes.client.models  # type: ignore
 
 
-class Manifest(list):
+class Manifest(List[Any]):
     """docstring for Manifest."""
 
-    def __init__(self, pluginName: str, manifestName: str = "", data=[],
-                 extension='yaml'):
+    def __init__(
+        self, pluginName: str, manifestName: str = "", data: List[Any] = [], extension: str = 'yaml'
+    ):
         super(Manifest, self).__init__(data)
         self._plugin_name = pluginName
         self._name = manifestName
@@ -19,7 +21,7 @@ class Manifest(list):
 
         self.resources = []  # type: ignore
 
-    def dumps(self, data) -> str:
+    def dumps(self, data: Any) -> str:
         docs = []
         for d in self:
             kc = ApiClient()
@@ -37,12 +39,12 @@ class Manifest(list):
         return "---\n" + '\n---\n'.join(docs)
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @name.setter
-    def name(self, val: str):
-        self._name
+    def name(self, val: str) -> None:
+        self._name = val
 
     @property
     def plugin_name(self) -> str:
@@ -52,14 +54,14 @@ class Manifest(list):
     def extension(self) -> str:
         return self._extension
 
-    def resource_by_name(self, name, apiVersion, kind):
+    def resource_by_name(self, name: str, apiVersion: str, kind: str) -> Optional[Any]:
         for r in self.resources:
             if r.Name == name and r.apiVersion == apiVersion and r.kind == kind:
                 return r
         return None
 
-    def resource_idx_by_name(self, name, apiVersion, kind):
-        for i in range(self.resources):
+    def resource_idx_by_name(self, name: str, apiVersion: str, kind: str) -> Optional[int]:
+        for i in range(len(self.resources)):
             r = self.resources[i]
             if r.Name == name and r.apiVersion == apiVersion and r.kind == kind:
                 return i
@@ -68,7 +70,7 @@ class Manifest(list):
     def serialize(self) -> str:
         return self._serializer(self)
 
-    def deserialize(self, data: str):
+    def deserialize(self, data: str) -> None:
         dload = self._deserializer(data)
         for dsi in dload:
             ds = dict(dsi)
@@ -91,18 +93,20 @@ class Manifest(list):
             self.append(ds)
 
     @classmethod
-    def genModelName(self, apiVersion: str, kind: str):
+    def genModelName(self, apiVersion: str, kind: str) -> str:
         apiv = apiVersion.split("/")[-1]
-        return "{}{}".format(apiv[0].upper()+apiv[1:], kind)
+        return "{}{}".format(apiv[0].upper() + apiv[1:], kind)
 
     @classmethod
-    def getModel(self, kind: str, apiVersion: str):
+    def getModel(self, kind: str, apiVersion: str) -> Optional[Any]:
         for cls in inspect.getmembers(kubernetes.client.models, inspect.isclass):
             if cls[0] == self.genModelName(apiVersion, kind):
                 return cls[1]
         return None
 
-    def findall_by_annotation(self, annotation, value=None):
+    def findall_by_annotation(
+        self, annotation: str, value: Optional[str] = None
+    ) -> Optional[List[str]]:
         rs = []
         for r in self.resources:
             for a, v in r.metadata.annotations.items():
@@ -117,7 +121,7 @@ class Manifest(list):
             return rs
         return None
 
-    def find_by_annotation(self, annotation, value=None):
+    def find_by_annotation(self, annotation: str, value: Optional[str] = None) -> Optional[str]:
         r = self.findall_by_annotation(annotation=annotation, value=value)
         if r is None:
             return r

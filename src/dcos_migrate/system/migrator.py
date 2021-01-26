@@ -1,14 +1,23 @@
 import logging
 from jsonpath_ng.ext import parse  # type: ignore
-from typing import Optional
+from typing import Any, Callable, Dict, Optional
 from dcos_migrate.system import Manifest
 import dcos_migrate.utils as utils
+from .backup import Backup
+from .backup_list import BackupList
+from .manifest_list import ManifestList
 
 
 class Migrator(object):
     """docstring for Migrator."""
 
-    def __init__(self, backup=None, backup_list=None, manifest_list=None, object=None):
+    def __init__(
+        self,
+        backup: Optional[Backup] = None,
+        backup_list: Optional[BackupList] = None,
+        manifest_list: Optional[ManifestList] = None,
+        object: Optional[Any] = None
+    ):
         super(Migrator, self).__init__()
         self.backup = backup
         self.object = object
@@ -18,13 +27,13 @@ class Migrator(object):
         self.manifest_list = manifest_list
         self.manifest = None
 
-        self.translate = {}
+        self.translate: Dict[str, Callable[[str, str, str], None]] = {}
 
-    def valid(self):
+    def valid(self) -> bool:
         """Returns True if self.object is what we expect"""
         return True
 
-    def dnsify(self, name: str):
+    def dnsify(self, name: str) -> str:
         new_name = utils.dnsify(name)
         if not name == new_name:
             logging.info(
@@ -43,6 +52,6 @@ class Migrator(object):
 
         return self.manifest
 
-    def noEquivalent(self, key, value, full_path):
-        logging.warning("No equivalent availbale for {full_path} with value {value}".format(
+    def noEquivalent(self, key: str, value: str, full_path: str) -> None:
+        logging.warning("No equivalent available for {full_path} with value {value}".format(
             full_path=full_path, value=value))
