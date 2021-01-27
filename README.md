@@ -12,7 +12,7 @@ This will create a sub-folder `dcos-migrate` in the current working directory. I
 Get the latest version
 
 ```
-docker pull mesosphere/dcos-migrate:latest
+docker pull mesosphere/dcos-migration:latest
 ```
 
 ### Run using your local DC/OS config
