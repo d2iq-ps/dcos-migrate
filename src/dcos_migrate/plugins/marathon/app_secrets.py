@@ -1,13 +1,15 @@
 import abc
 import re
-from typing import Optional
-from collections import namedtuple
+from typing import Dict, Mapping, NamedTuple, Optional, Sequence
 
 import dcos_migrate.utils as utils
 
 from .common import InvalidAppDefinition, AdditionalFlagNeeded
 
-SecretReference = namedtuple("SecretReference", ['secret_name', 'key'])
+
+class SecretReference(NamedTuple):
+    secret_name: str
+    key: str
 
 
 class AppSecretMapping(abc.ABC):
@@ -20,26 +22,43 @@ class AppSecretMapping(abc.ABC):
         pass
 
 
-class MonolithicAppSecretMapping(AppSecretMapping):
+class SecretRemapping(NamedTuple):
+    """Settings for remapping keys of the monolithic DCOS secret into app-specific secrets"""
+    dest_name: str
+    dest_type: Optional[str]
+    key_mapping: Dict[str, str]
+
+
+class TrackingAppSecretMapping(AppSecretMapping):
     """
-    A mapping that assumes that all the secrets used by the app were migrated
-    as keys of a single K8s secret processed via `utils.dnsify()`.
+    Tracks which secrets are used by callers of `AppSecretMapping` interface
+    and reports them via `get_secrets_to_remap()`.
     """
-    def __init__(self, app: dict, imported_k8s_secret_name: Optional[str]):
-        self._app_id = app.get('id')
-        self._secrets = app.get('secrets', {})
-        self._imported_k8s_secret_name = imported_k8s_secret_name
+    def __init__(
+        self,
+        app_id: str,
+        app_secrets: Mapping[str, Mapping[str, str]],
+    ):
+        self._app_secrets = app_secrets
+
+        self._generic_remapping = SecretRemapping(
+            dest_name="marathonsecret-{}".format(utils.dnsify(app_id)),
+            dest_type=None,
+            key_mapping={}
+        )
 
     def get_reference(self, app_secret_name: str) -> SecretReference:
-        if self._imported_k8s_secret_name is None:
-            raise AdditionalFlagNeeded(
-                'The app {} is using secrets; please specify the'
-                ' name of the imported DCOS secret and run again'.format(self._app_id))
-
         try:
-            key = self._secrets[app_secret_name]['source']
+            dcos_name = self._app_secrets[app_secret_name]['source']
         except KeyError:
             raise InvalidAppDefinition(
                 'No source specified for a secret "{}"'.format(app_secret_name))
 
-        return SecretReference(self._imported_k8s_secret_name, utils.dnsify(key))
+        k8s_key = utils.dnsify(dcos_name)
+        self._generic_remapping.key_mapping[k8s_key] = k8s_key
+        return SecretReference(self._generic_remapping.dest_name, k8s_key)
+
+
+    def get_secrets_to_remap(self) -> Sequence[SecretRemapping]:
+        # TODO (asekretenko): add SecretRemapping for creating an image pull secret.
+        return (self._generic_remapping, )

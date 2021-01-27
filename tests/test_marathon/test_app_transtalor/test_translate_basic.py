@@ -4,7 +4,7 @@ import sys
 import pytest
 
 from dcos_migrate.plugins.marathon import app_translator
-from dcos_migrate.plugins.marathon.app_secrets import MonolithicAppSecretMapping
+from dcos_migrate.plugins.marathon.app_secrets import TrackingAppSecretMapping
 
 from .common import DummyAppSecretMapping
 
@@ -109,18 +109,24 @@ def test_translates_args():
 
 def test_env_secret():
     app = {
-        "id":"app",
+        "id": "foobarify",
         "env": {"FOO": {"secret": "bar"}},
         "secrets": {"bar": {"source": "/deadbeef/baz"}},
     }
 
     settings = app_translator.Settings(
         app_translator.ContainerDefaults(image="lazybox", working_dir=None),
-        app_secret_mapping=MonolithicAppSecretMapping(app=app, imported_k8s_secret_name="dummy"),
+        app_secret_mapping=TrackingAppSecretMapping(app['id'], app['secrets']),
     )
 
 
     result, _ = app_translator.translate_app(app, settings)
     env = result['spec']['template']['spec']['containers'][0]['env']
 
-    assert env == [{'name': 'FOO', 'valueFrom': {'secretKeyRef': {'name': 'dummy', 'key': 'deadbeef.baz'}}}]
+    assert env == [{
+        'name': 'FOO',
+        'valueFrom': {
+            'secretKeyRef': {
+                'name': 'marathonsecret-foobarify',
+                'key': 'deadbeef.baz',
+            }}}]
