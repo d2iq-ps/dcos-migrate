@@ -1,8 +1,7 @@
-#!/usr/bin/env python
 import logging
 import sys
 
-from typing import List
+from typing import List, Optional
 
 from dcos_migrate.system import DCOSClient, BackupList, ManifestList, ArgParse
 from dcos_migrate.plugins.plugin_manager import PluginManager
@@ -19,11 +18,11 @@ class DCOSMigrate(object):
         self.backup_list = BackupList()
         self.arpparse = ArgParse(
             self.pm.config_options,
-            prog='dcos_migrate',
+            prog='dcos-migrate',
             usage='Does a backup of your DC/OS cluster and migrates everything into K8s Manifests'
         )
 
-    def run(self, args: List[str]):
+    def run(self, args: Optional[List[str]] = None):
         self.handleArgparse(args)
         self.backup()
         self.migrate()
@@ -82,6 +81,6 @@ class DCOSMigrate(object):
         return self.pm.plugins.keys()
 
 
-if __name__ == "__main__":
+def run():
     logging.basicConfig(level=logging.WARNING)
-    DCOSMigrate().run(sys.argv)
+    DCOSMigrate().run()
