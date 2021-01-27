@@ -16,7 +16,7 @@ class DCOSMigrate(object):
         self.pm = PluginManager()
         self.manifest_list = ManifestList()
         self.backup_list = BackupList()
-        self.arpparse = ArgParse(
+        self.argparse = ArgParse(
             self.pm.config_options,
             prog='dcos-migrate',
             usage='Does a backup of your DC/OS cluster and migrates everything into K8s Manifests'
@@ -28,7 +28,7 @@ class DCOSMigrate(object):
         self.migrate()
 
     def handleArgparse(self, args: Optional[List[str]] = None):
-        self.pm.config = self.arpparse.parse_args(args)
+        self.pm.config = self.argparse.parse_args(args)
 
     def backup(self, pluginName=None):
         logging.info("Calling {} Backup Batches".format(
