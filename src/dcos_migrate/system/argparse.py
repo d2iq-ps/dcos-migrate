@@ -79,7 +79,7 @@ class BoolArg(Arg):
 
 
 class DictArg(Arg):
-    """docstring for BoolAr g."""
+    """docstring for BoolArg."""
 
     def __init__(self, name: str, **kwargs: Any):
         super(DictArg, self).__init__(name, **kwargs)
@@ -88,9 +88,11 @@ class DictArg(Arg):
         if not self._metavar:
             self._metavar = "KEY=VALUE"
 
-    def get_result(self, namespace: argparse.Namespace) -> Dict[str, Any]:
+    def get_result(self, namespace: argparse.Namespace) -> Optional[Dict[str, Any]]:
         res = {}
         attr = getattr(namespace, self.attr_arg)
+        if not attr:
+            return None
         for a in attr:
             aplit = a.split("=")
             res[aplit[0]] = "=".join(aplit[1:])
@@ -124,7 +126,7 @@ class ArgParse(object):
         for a in self.args:
             a.add_argument(self._parser)
 
-    def parse_args(self, args: list) -> Optional[Dict[str, Any]]:
+    def parse_args(self, args: Optional[list] = None) -> Optional[Dict[str, Any]]:
         if not self.parser:
             return None
         parsed_args = self.parser.parse_args(args)

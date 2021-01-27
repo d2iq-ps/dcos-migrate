@@ -8,6 +8,27 @@ At the moment only a full backup and migrate run is supported:
 This will create a sub-folder `dcos-migrate` in the current working directory. It contains a `backup` folder with a complete backup of all workloads. And a `migrate` folder.
 
 
+## Run with docker
+Get the latest version
+
+```
+docker pull mesosphere/dcos-migrate:latest
+```
+
+### Run using your local DC/OS config
+
+```
+docker run -v"${HOME}/.dcos:/root/.dcos"  mesosphere/dcos-migration:latest
+
+docker run -v"${HOME}/.dcos:/root/.dcos"  mesosphere/dcos-migration:latest dcos-migrate -h
+```
+
+### Run using environment variables
+**WIP**
+```
+docker run -e"DCOS_CLUSTER_"  mesosphere/dcos-migration:latest
+```
+
 ## Migrated Manifests
 This tool creates manifest plugin based for different DC/OS workloads.
 
