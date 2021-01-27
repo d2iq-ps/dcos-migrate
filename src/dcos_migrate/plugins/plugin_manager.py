@@ -2,14 +2,14 @@ import importlib
 import pkgutil
 import inspect
 import logging
-from typing import Dict, List, Any
+from typing import Any, Dict, Iterator, List
 
 import dcos_migrate.plugins
 from dcos_migrate.plugins.plugin import MigratePlugin
 from dcos_migrate.system import Arg
 
 
-def is_plugin(obj):
+def is_plugin(obj: Any) -> bool:
     return (
         inspect.isclass(obj)
         and issubclass(obj, MigratePlugin)
@@ -66,12 +66,12 @@ class PluginManager(object):
 
     plugin_namespace = dcos_migrate.plugins
 
-    def __init__(self, plugins={}):
+    def __init__(self, plugins: Dict[str, MigratePlugin] = {}):
 
-        self.backup = []
-        self.backup_data = []
-        self.migrate = []
-        self.migrate_data = []
+        self.backup: List[List[MigratePlugin]] = []
+        self.backup_data: List[List[MigratePlugin]] = []
+        self.migrate: List[List[MigratePlugin]] = []
+        self.migrate_data: List[List[MigratePlugin]] = []
         self.plugins = plugins
         self._config_options = []
         self._config = {}
@@ -82,27 +82,27 @@ class PluginManager(object):
         if not plugins:
             self.discover_modules()
 
-    def iter_namespace(self):
-        return pkgutil.iter_modules(self.plugin_namespace.__path__,
+    def iter_namespace(self) -> Iterator[pkgutil.ModuleInfo]:
+        return pkgutil.iter_modules(self.plugin_namespace.__path__,  # type: ignore
                                     self.plugin_namespace.__name__ + ".")
 
     @ property
-    def backup_batch(self):
+    def backup_batch(self) -> List[List[MigratePlugin]]:
         """list: List of list of tuples plugin name and plugin class."""
         return self.backup
 
     @ property
-    def backup_data_batch(self):
+    def backup_data_batch(self) -> List[List[MigratePlugin]]:
         """list: List of tuples plugin name and plugin class."""
         return self.backup_data
 
     @ property
-    def migrate_batch(self):
+    def migrate_batch(self) -> List[List[MigratePlugin]]:
         """list: List of tuples plugin name and plugin class."""
         return self.migrate
 
     @ property
-    def migrate_data_batch(self):
+    def migrate_data_batch(self) -> List[List[MigratePlugin]]:
         """list: List of tuples plugin name and plugin class."""
         return self.migrate_data
 
@@ -120,7 +120,7 @@ class PluginManager(object):
         for p in self.plugins.values():
             p.config = config
 
-    def discover_modules(self):
+    def discover_modules(self) -> None:
         # https://packaging.python.org/guides/creating-and-discovering-plugins/#using-namespace-packages
         for finder, name, ispkg in self.iter_namespace():
             plugin_module = importlib.import_module(name)
@@ -133,7 +133,7 @@ class PluginManager(object):
         # if we discover we need to build dependencies
         self.build_dependencies()
 
-    def build_dependencies(self):
+    def build_dependencies(self) -> None:
         self.backup = get_dependency_batches(plugins=self.plugins,
                                              depattr="backup_depends")
         logging.debug("Backup batches {}".format(self.backup))

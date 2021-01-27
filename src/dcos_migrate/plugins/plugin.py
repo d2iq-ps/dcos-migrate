@@ -37,14 +37,18 @@ class MigratePlugin(object):
     def config_options(self) -> List[Arg]:
         return self._config_options
 
-    def backup(self, client: DCOSClient, backupList: BackupList, **kwargs) -> BackupList:
+    def backup(self, client: DCOSClient, backupList: BackupList, **kwargs: Any) -> BackupList:
         pass
 
-    def backup_data(self, client: DCOSClient, **kwargs):
+    def backup_data(self, client: DCOSClient, **kwargs: Any) -> Any:
         pass
 
-    def migrate(self, backupList: BackupList, manifestList: ManifestList, **kwargs) -> ManifestList:
+    def migrate(
+        self, backupList: BackupList, manifestList: ManifestList, **kwargs: Any
+    ) -> ManifestList:
         pass
 
-    def migrate_data(self, backupList: BackupList, manifestList: ManifestList, **kwargs):
+    def migrate_data(
+        self, backupList: BackupList, manifestList: ManifestList, **kwargs: Any
+    ) -> Any:
         pass

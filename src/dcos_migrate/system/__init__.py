@@ -6,3 +6,13 @@ from .manifest_list import ManifestList
 from .manifest import Manifest
 from .migrator import Migrator
 from .storable_list import StorableList
+
+__all__ = [
+    'BackupList',
+    'DCOSClient',
+    'Backup',
+    'ManifestList',
+    'Manifest',
+    'Migrator',
+    'StorableList',
+]

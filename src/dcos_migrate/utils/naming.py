@@ -19,7 +19,7 @@ def dnsify(name: str) -> str:
     return _invalid_secret_key.sub('_', name)
 
 
-def namespace_path(*args):
+def namespace_path(*args: str) -> str:
     """
     Uses namespace constant. Adds every argument as path part
 

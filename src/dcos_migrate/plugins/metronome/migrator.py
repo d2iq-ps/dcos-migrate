@@ -1,185 +1,223 @@
 from dcos_migrate.system import Migrator, Manifest
-from kubernetes.client.models import (  # type: ignore
-    V1beta1CronJob, V1beta1CronJobSpec, V1beta1JobTemplateSpec, V1JobSpec,
-    V1ObjectMeta, V1PodSpec, V1Container, V1ResourceRequirements
-)
+import kubernetes.client.models as K  # type: ignore
 import logging
+import re
+
+
+# FIXME: reuse version from secrets migration. BEWARE: added lstrip(".")!
+_invalid_secret_key = re.compile("[^-._a-zA-Z0-9]")
+
+
+def clean_key(s: str) -> str:
+    # Replace DC/OS folders with dots
+    s = s.replace("/", ".")
+    # Replace other invalid characters with `_`
+    # `folder/sec!ret` becomes `folder.sec_ret`
+    return _invalid_secret_key.sub("_", s).lstrip(".")
 
 
 class MetronomeMigrator(Migrator):
     """docstring for SecretsMigrator."""
 
-    def __init__(self,
-                 defaultImage="alpine:latest",
-                 forceJob=False,
-                 secretOverwrites={},
-                 **kw):
+    def __init__(
+        self, defaultImage="alpine:latest", forceJob=False, secretOverwrites={}, **kw
+    ):
         super(MetronomeMigrator, self).__init__(**kw)
 
         self.manifest = None
 
-        self.apiVersion = "batch/v1beta1"
-        self.kind = "CronJob"
-
         self.image = defaultImage
         self.forceJob = forceJob
         self.secretOverwrites = secretOverwrites
+        self._warnings = dict()
         self.translate = {
-            "id": self.initJob,
+            "id": self.initCronJob,
+            "dependencies|run.docker.parameters": self.noEquivalent,
             "description": self.handleDescription,
             "labels.*": self.handleLabels,
-            "run.args":  self.handleRunArgs,
-            "run.cpus|gpus|mem|disk": self.handleLimits,
-            "run.args|cmd": self.handleCmd,
+            "run.args": self.handleRunArgs,
             "run.artifacts": self.handleArtifacts,
-            "secrets": self.handleSecrets,
-            "env": self.handleEnv,
-            "dependencies|run.maxLaunchDelay|run.docker.parameters": self.noEquivalent
+            "run.cmd": self.handleCmd,
+            "run.cpus": self.handleLimitsCPUs,
+            "run.disk": self.handleLimitsDisk,
+            "run.docker.forcePullImage": self.handleForcePull,
+            "run.docker.image": self.handleImage,
+            "run.docker.privileged": self.handlePrivileged,
+            "run.env": self.handleEnv,
+            "run.gpus": self.handleLimitsGPUs,
+            "run.maxLaunchDelay": self.handleMaxLaunchDelay,
+            "run.mem": self.handleLimitsMem,
+            "run.networks": self.handleNetworks,
+            "run.placement.constraints": self.handlePlacementConstraints,
+            "run.restart.activeDeadlineSeconds": self.handleActiveDeadlineSeconds,
+            "run.restart.policy": self.handleRestartPolicy,
+            # run.secrets does not need to be handled explicitly. run.env will use its data.
+            "run.taskKillGracePeriodSeconds": self.handleTaskKillGracePeriod,
+            "run.ucr": self.handleUCR,
+            "run.user": self.handleUser,
+            "run.volumes": self.handleVolumes,
+            "schedules[0]": self.handleSchedule,
         }
 
     @property
-    def job(self):
+    def cronJob(self):
         return self.manifest[0]
 
-    @job.setter
-    def job(self, job):
-        if len(self.manifest) > 0:
-            self.manifest[0] = job
-            return
+    @property
+    def job(self):
+        return self.cronJob.spec.job_template
 
-        self.manifest.append(job)
+    @property
+    def container(self):
+        return self.job.spec.template.containers[0]
 
-    # if ".id" == key:
-    #     return update(
-    #         {
-    #             "metadata": {"name": dnsify(val)},
-    #             "spec": {"template": {"spec": {"containers": [{"name": dnsify(val)}]}}},
-    #         }
-    #     )
+    def warn(self, path, msg):
+        self._warnings[path] = msg
 
-    def initJob(self, key, value, full_path):
+    def initCronJob(self, key, value, full_path):
         name = self.dnsify(value)
-        self.manifest = Manifest(
-            data=[None], pluginName='metronome', manifestName=name)
-        metadata = V1ObjectMeta(name=name)
+        self.manifest = Manifest(data=[None], pluginName="metronome", manifestName=name)
+        metadata = K.V1ObjectMeta(name=name)
         clusterMeta = self.manifest_list.clusterMeta()
         if clusterMeta:
             metadata.annotations = clusterMeta.annotations
-        job = V1beta1CronJob(metadata=metadata)
-        job.kind = self.kind
-        job.apiVersion = self.apiVersion
-        job.spec = V1beta1CronJobSpec(
-            schedule="* * * * *",
-            suspend=True,
-            job_template=V1beta1JobTemplateSpec(
-                spec=V1JobSpec(
-                    template=V1PodSpec(containers=[V1Container(name=name, resources=V1ResourceRequirements(limits={}, requests=None
-                                                                                                           ))])
-                )
-            )
+        self.manifest = [K.V1beta1CronJob(metadata=metadata)]
+        # self.cronJob.kind = "CronJob"
+        # self.cronJob.apiVersion = "batch/v1beta1"
+
+        resources = K.V1ResourceRequirements(limits={}, requests={})
+        container1 = K.V1Container(name=name, resources=resources)
+        podSpec = K.V1PodSpec(containers=[container1])
+        jobTmpl = K.V1beta1JobTemplateSpec(spec=K.V1JobSpec(template=podSpec))
+        self.cronJob.spec = K.V1beta1CronJobSpec(
+            schedule="* * * * *", suspend=True, job_template=jobTmpl,
         )
-        self.job = job
 
-    def handleDependencies(self, key, value, full_path):
-        logging.warning("Not migrating dependencies")
-
-    # if ".description" == key:
-    #     if not val:
-    #         return result
-    #     return update({"metadata": {"annotations": {"description": val}}})
-
-    def handleDescription(self, key, value, full_path):
-        j = self.job
-        j.metadata.annotations['migration.dcos.d2iq.com/description'] = value
-
-    # if ".labels" == key:
-    #     return update({"metadata": {"labels": val}})
-
-    def handleLabels(self, key, value, full_path):
-        j = self.job
-        j.metadata.annotations['migration.dcos.d2iq.com/label/{}'.format(
-            key)] = value
-
-    # if re.match(".run.args", key):
-    #     return update_container(
-    #         {"args": result.get("run", {}).get("args", []).append(val)}
-    #     )
-
-    def handleRunArgs(self, key, value, full_path):
-        j = self.job
-
-        j.spec.job_template.spec.template.spec.containers[0].args = value
-
-    # if ".run.cpus" == key:
-    #     if val == 0:
-    #         return result
-    #     return update_container({"resources": {"limits": {"cpu": val}}})
-    #
-    # if ".run.disk" == key:
-    #     if val == 0:
-    #         return result
-    #     return update_container({"resources": {"limits": {"ephemeral-storage": val}}})
-    #
-    # if ".run.gpus" == key:
-    #     if val == 0:
-    #         return result
-    #     return update_container(
-    #         {
-    #             "resources": {
-    #                 "requests": {"nvidia.com/gpu": val},
-    #                 "limits": {"nvidia.com/gpu": val},
-    #             },
-    #         }
-    #     )
-    #
-    # if ".run.mem" == key:
-    #     if val == 0:
-    #         return result
-    #     return update_container({"resources": {"limits": {"memory": str(val) + "Mi"}}})
-
-    def handleLimits(self, key, value, full_path):
-        j = self.job
-        container = j.spec.job_template.spec.template.containers[0]
-
-        if "cpus" == key:
-            container.resources.limits.update({"cpu": value})
-
-        if "mem" == key:
-            container.resources.limits["memory"] = str(
-                value) + "Mi"
-
-        if "disk" == key:
-            if value == 0:
-                return
-            container.resources.limits["ephemeral-storage"] = value
-
-        if "gpus" == key and value != 0:
-            if not container.resources:
-                container.resources.requests = {}
-            container.resources.requests["nvidia.com/gpu"] = value
-            container.resources.limits["nvidia.com/gpu"] = value
-
-        j.spec.job_template.spec.template.containers[0] = container
-
-    # if ".run.cmd" == key:
-    #     if not val:
-    #         return result
-    #     return update_container({"command": ["/bin/sh", "-c", val]})
-    #
-    # if re.match(".run.args", key):
-    #     return update_container(
-    #         {"args": result.get("run", {}).get("args", []).append(val)}
-    #     )
-
-    def handleCmd(self, key, value, full_path):
-        # if "cmd" == key & & value != "":
-        pass
+    def handleActiveDeadlineSeconds(self, key, value, full_path):
+        self.warn(
+            full_path,
+            f'DKP has no equivalent for "run.restart.activeDeadlineSeconds", dropping: {value}',
+        )
 
     def handleArtifacts(self, key, value, full_path):
         pass
 
-    def handleSecrets(self, key, value, full_path):
-        pass
+    def handleCmd(self, key, value, full_path):
+        if value and value != "":
+            self.container.command = ["/bin/sh", "-c", value]
+
+    def handleDescription(self, key, value, full_path):
+        self.cronJob.metadata.annotations["migration.dcos.d2iq.com/description"] = value
 
     def handleEnv(self, key, value, full_path):
+        env = []
+        for k, v in value:
+            if "secret" in v:
+                keyRef = clean_key(self.object.get("secrets").get(k).get("source"))
+                # TODO: find ref from secrets metadata
+                key_selector = K.V1SecretKeySelector(key=keyRef, name="TODO_ref")
+                env_var_src = K.V1EnvVarSource(secret_key_ref=key_selector)
+                env.append(K.V1EnvVar(name=k, value_from=env_var_src))
+            else:
+                env.append(K.V1EnvVar(name=k, value=v))
+
+        self.container.env = env
+
+    def handleForcePull(self, key, value, full_path):
+        self.container.imagePullPolicy = "Always" if value else "IfNotPresent"
+
+    def handleImage(self, key, value, full_path):
+        self.container.image = value
+
+    def handleLabels(self, key, value, full_path):
+        k = f"migration.dcos.d2iq.com/label/{key}"
+        self.cronJob.metadata.annotations[k] = value
+
+    def handleLimitsCPUs(self, key, value, full_path):
+        self.container.resources.limits.update({"cpu": value})
+
+    def handleLimitsDisk(self, key, value, full_path):
+        if value == 0:
+            return
+        self.container.resources.limits["ephemeral-storage"] = value
+
+    def handleLimitsGPUs(self, key, value, full_path):
+        self.container.resources.requests["nvidia.com/gpu"] = value
+        self.container.resources.limits["nvidia.com/gpu"] = value
+
+    def handleLimitsMem(self, key, value, full_path):
+        self.container.resources.limits["memory"] = str(value) + "Mi"
+
+    def handleMaxLaunchDelay(self, key, value, full_path):
+        if not value == 3600:
+            self.warn(full_path, "maxLaunchDelay is not available in DKP")
+
+    def handleNetworks(self, key, value, full_path):
+        if value != []:
+            self.warn(full_path, "conversion of .run.networks is not yet implemented.")
+
+    def handlePlacementConstraints(self, key, value, full_path):
+        if value != []:
+            self.warn(
+                full_path, "conversion of .run.placement.constraints not implemented.",
+            )
+
+    def handlePrivileged(self, key, value, full_path):
+        self.container.securityContext = K.V1PodSecurityContext(dict(privileged=value))
+
+    def handleRestartPolicy(self, key, value, full_path):
+        if value.title() == "Never":
+            self.job.spec.restartPolicy = value.title()
+        else:
+            self.warn(
+                full_path,
+                f"restartPolicy '{value}' was dropped. Now the default of 'spec.backoffLimit' will implicitly try 6 times.",
+            )
+
+    def handleRunArgs(self, key, value, full_path):
+        self.job.spec.template.spec.containers[0].args = value
+
+    def handleSchedule(self, key, value, full_path):
+        if "concurrencyPolicy" in value:
+            self.cronJob.spec.concurrencyPolicy = value["concurrencyPolicy"].title()
+        if "cron" in value:
+            self.cronJob.spec.schedule = value["cron"]
+        if "enabled" in value:
+            self.cronJob.spec.suspend = not value["enabled"]
+        if "startingDeadlineSeconds" in value:
+            self.cronJob.spec.startingDeadlineSeconds = value["startingDeadlineSeconds"]
+        if "timeZone" in value:
+            v = value["timeZone"]
+            if not ("UTC" == v):
+                self.warn(
+                    full_path,
+                    f'You might need to edit the cron expression (spec.schedule) to account for an update from "{value}" to your target cluster\'s timezone.',
+                )
+
+    def handleTaskKillGracePeriod(self, key, value, full_path):
+        self.job.spec.terminationGracePeriodSeconds = value
+
+    def handleUCR(self, key, value, full_path):
+        self.warn(
+            full_path,
+            f'Migrating "{full_path}" is not (yet) supported. You might want to manually convert and add your UCR configuration to the resulting yaml.',
+        )
+        # if not "docker" == model.pop(".run.ucr.image.kind", None):
+        #     return
+        # warn("Converting UCR configuration as .kind is 'docker'. Please check whether UCR is required for your use case.")
+        # if ".run.ucr.image.forcePull" in model:
+        #     model[".run.docker.forcePullImage"] = model.pop(".run.ucr.image.forcePull")
+        # if ".run.ucr.image.id" in model:
+        #     model[".run.docker.image"] = model.pop(".run.ucr.image.id")
+        # if ".run.ucr.privileged" in model:
+        #     model[".run.docker.privileged"] = model.pop(".run.ucr.privileged")
+
+    def handleUser(self, key, value, full_path):
+        self.warn(
+            full_path,
+            f'Found "run.user": "{value}". You might need to set "spec.template.spec.containers[].securityContext.runAsUser" manually, as we can\'t infer a mapping to the according uid on the target node.',
+        )
         pass
+
+    def handleVolumes(self, key, value, full_path):
+        self.warn(full_path, "TODO: conversion of .run.volumes is not yet implemented.")

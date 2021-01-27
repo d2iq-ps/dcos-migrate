@@ -9,6 +9,7 @@ import urllib
 import base64
 import logging
 from base64 import b64encode
+from typing import Any, Dict, List
 
 
 class DCOSSecretsService:
@@ -18,7 +19,7 @@ class DCOSSecretsService:
         self.url = "{}/{}".format(self.client.dcos_url, 'secrets/v1')
         self.store = 'default'
 
-    def list(self, path: str = ''):
+    def list(self, path: str = '') -> List[str]:
         u = '{url}/secret/{store}/{path}?list=true'.format(
             url=self.url,
             store=urllib.parse.quote(self.store),
@@ -28,7 +29,7 @@ class DCOSSecretsService:
         r.raise_for_status()
         return r.json()['array']
 
-    def get(self, path: str, key: str):
+    def get(self, path: str, key: str) -> Dict[str, str]:
         # There are two types of secrets: text and binary.  Using `Accept: */*`
         # the returned `Content-Type` will be `application/octet-stream` for
         # binary secrets and `application/json` for text secrets.
@@ -78,7 +79,7 @@ class SecretPlugin(MigratePlugin):
     plugin_name = "secret"
     depends_migrate = [ClusterPlugin.plugin_name]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(SecretPlugin, self).__init__()
 
     def backup(self, client: DCOSClient, **kwargs) -> BackupList:  # type: ignore
@@ -95,10 +96,13 @@ class SecretPlugin(MigratePlugin):
 
         return backupList
 
-    def migrate(self, backupList: BackupList, manifestList: ManifestList, **kwargs) -> ManifestList:
+    def migrate(
+        self, backupList: BackupList, manifestList: ManifestList, **kwargs: Any
+    ) -> ManifestList:
         ml = ManifestList()
 
         for ba in backupList.backups(pluginName='secret'):
+            assert isinstance(ba, Backup)
             metadata = V1ObjectMeta()
             metadata.annotations = {}
 

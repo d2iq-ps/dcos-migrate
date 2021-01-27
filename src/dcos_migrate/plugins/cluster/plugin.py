@@ -6,6 +6,7 @@ import json
 import logging
 import datetime
 from base64 import b64encode
+from typing import Any
 
 
 class ClusterPlugin(MigratePlugin):
@@ -13,10 +14,10 @@ class ClusterPlugin(MigratePlugin):
     plugin_name = "cluster"
     # No depends wanna run first
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(ClusterPlugin, self).__init__()
 
-    def backup(self, client: DCOSClient, backupList: BackupList, **kwargs) -> BackupList:
+    def backup(self, client: DCOSClient, backupList: BackupList, **kwargs: Any) -> BackupList:
         bl = BackupList()
         metadataResp = client.get(client.full_dcos_url('/metadata'))
         stateSumResp = client.get(
@@ -38,7 +39,7 @@ class ClusterPlugin(MigratePlugin):
 
         return bl
 
-    def migrate(self, backupList: BackupList, manifestList: ManifestList, **kwargs) -> ManifestList:
+    def migrate(self, backupList: BackupList, manifestList: ManifestList, **kwargs: Any) -> ManifestList:
         ml = ManifestList()
 
         clusterBackup = backupList.backup(

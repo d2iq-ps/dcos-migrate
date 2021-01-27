@@ -18,3 +18,4 @@
 jsonpath_ng==1.5.2
 dcos==0.6.1
 kubernetes
+pytest-snapshot
