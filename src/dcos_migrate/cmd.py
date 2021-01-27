@@ -27,7 +27,7 @@ class DCOSMigrate(object):
         self.backup()
         self.migrate()
 
-    def handleArgparse(self, args: List[str]):
+    def handleArgparse(self, args: Optional[List[str]] = None):
         self.pm.config = self.arpparse.parse_args(args)
 
     def backup(self, pluginName=None):

@@ -1,5 +1,5 @@
 import argparse
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union, Iterable, Callable
 
 
 class Arg(object):
@@ -7,16 +7,16 @@ class Arg(object):
 
     def __init__(self,
                  name: str,
-                 plugin_name=None,
-                 action='store',
-                 nargs=None,
-                 epilog='',
-                 default=None,
-                 type=None,
-                 choices=None,
-                 required=False,
-                 help='',
-                 metavar=None):
+                 plugin_name: Optional[str] = None,
+                 action: str = 'store',
+                 nargs: Union[int, str] = None,
+                 epilog: str = '',
+                 default: Optional[Any] = None,
+                 type: Union[Callable[[str], Any], Any] = None,
+                 choices: Iterable[Any] = None,
+                 required: bool = False,
+                 help: str = '',
+                 metavar: Optional[str] = None):
         super(Arg, self).__init__()
         self._name = name
         self._plugin_name = plugin_name
@@ -30,7 +30,7 @@ class Arg(object):
         self._metavar = metavar
 
     @ property
-    def plugin_name(self) -> str:
+    def plugin_name(self) -> Optional[str]:
         return self._plugin_name
 
     @ property
@@ -66,7 +66,7 @@ class BoolArg(Arg):
     def __init__(self, name: str, **kwargs: Any):
         super(BoolArg, self).__init__(name, **kwargs)
 
-    def add_argument(self, parser: argparse.ArgumentParser):
+    def add_argument(self, parser: argparse.ArgumentParser) -> None:
         noarg = self.arg_name.replace("--", "--no-", 1)
         parser.add_argument(noarg, action='store_false',
                             default=self._default,

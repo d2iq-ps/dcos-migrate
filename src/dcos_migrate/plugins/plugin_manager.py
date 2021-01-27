@@ -73,8 +73,8 @@ class PluginManager(object):
         self.migrate: List[List[MigratePlugin]] = []
         self.migrate_data: List[List[MigratePlugin]] = []
         self.plugins = plugins
-        self._config_options = []
-        self._config = {}
+        self._config_options: List[Arg] = []
+        self._config: Dict[str, Any] = {}
 
         self.build_dependencies()
 
@@ -112,11 +112,11 @@ class PluginManager(object):
 
     @property
     def config(self) -> Dict[str, Any]:
-        return self._options
+        return self._config
 
     @config.setter
     def config(self, config: Dict[str, Any]):
-        self._options = config
+        self._config = config
         for p in self.plugins.values():
             p.config = config
 
