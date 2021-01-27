@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterator, List
 
 import dcos_migrate.plugins
 from dcos_migrate.plugins.plugin import MigratePlugin
+from dcos_migrate.system import Arg
 
 
 def is_plugin(obj: Any) -> bool:
@@ -72,6 +73,8 @@ class PluginManager(object):
         self.migrate: List[List[MigratePlugin]] = []
         self.migrate_data: List[List[MigratePlugin]] = []
         self.plugins = plugins
+        self._config_options: List[Arg] = []
+        self._config: Dict[str, Any] = {}
 
         self.build_dependencies()
 
@@ -103,6 +106,20 @@ class PluginManager(object):
         """list: List of tuples plugin name and plugin class."""
         return self.migrate_data
 
+    @property
+    def config_options(self) -> List[Arg]:
+        return self._config_options
+
+    @property
+    def config(self) -> Dict[str, Any]:
+        return self._config
+
+    @config.setter
+    def config(self, config: Dict[str, Any]) -> None:
+        self._config = config
+        for p in self.plugins.values():
+            p.config = config
+
     def discover_modules(self) -> None:
         # https://packaging.python.org/guides/creating-and-discovering-plugins/#using-namespace-packages
         for finder, name, ispkg in self.iter_namespace():
@@ -129,3 +146,10 @@ class PluginManager(object):
         self.migrate_data = get_dependency_batches(plugins=self.plugins,
                                                    depattr="migrate_data_depends")
         logging.debug("Migrate Data batches {}".format(self.migrate_data))
+
+        self.build_config_options()
+
+    def build_config_options(self) -> None:
+        for p in self.plugins.values():
+            co = p._config_options
+            self._config_options.extend(co)

@@ -1,8 +1,9 @@
-#!/bin/env python
-
-# import click - not yet used not yet in requirements
 import logging
-from dcos_migrate.system import DCOSClient, BackupList, ManifestList
+import sys
+
+from typing import List, Optional
+
+from dcos_migrate.system import DCOSClient, BackupList, ManifestList, ArgParse
 from dcos_migrate.plugins.plugin_manager import PluginManager
 
 
@@ -15,11 +16,19 @@ class DCOSMigrate(object):
         self.pm = PluginManager()
         self.manifest_list = ManifestList()
         self.backup_list = BackupList()
+        self.argparse = ArgParse(
+            self.pm.config_options,
+            prog='dcos-migrate',
+            usage='Does a backup of your DC/OS cluster and migrates everything into K8s Manifests'
+        )
 
-    def run(self):
+    def run(self, args: Optional[List[str]] = None):
+        self.handleArgparse(args)
         self.backup()
         self.migrate()
-        pass
+
+    def handleArgparse(self, args: Optional[List[str]] = None):
+        self.pm.config = self.argparse.parse_args(args)
 
     def backup(self, pluginName=None):
         logging.info("Calling {} Backup Batches".format(
@@ -72,6 +81,6 @@ class DCOSMigrate(object):
         return self.pm.plugins.keys()
 
 
-if __name__ == "__main__":
+def run():
     logging.basicConfig(level=logging.WARNING)
     DCOSMigrate().run()

@@ -1,7 +1,7 @@
 from dcos_migrate.plugins.plugin import MigratePlugin
 from dcos_migrate.plugins.cluster import ClusterPlugin
 from dcos_migrate.plugins.secret import SecretPlugin
-from dcos_migrate.system import DCOSClient, BackupList, Backup, ManifestList
+from dcos_migrate.system import DCOSClient, BackupList, Backup, ManifestList, DictArg, Arg
 from .migrator import MarathonMigrator
 import logging
 
@@ -14,6 +14,22 @@ class MarathonPlugin(MigratePlugin):
 
     def __init__(self):
         super(MarathonPlugin, self).__init__()
+        # TODO: returned config is not yet used
+        self._config_options = [DictArg(
+            "secretoverwrite", plugin_name=self.plugin_name,
+            metavar='DCOS_SECRET=K8s_SECRET',
+            help='Map DC/OS secrets to a different K8s secret. K8s data key must equal DC/OS secret name'
+        ), Arg(
+            "image", plugin_name=self.plugin_name,
+            default="alpine:latest",
+            metavar="IMAGE",
+            help='Image to be used when assets need to be fetched.'
+        ), Arg(
+            "workdir", plugin_name=self.plugin_name,
+            default="/",
+            metavar="WORKDIR",
+            help='Workdir which fetched artifacts are downloaded to.'
+        )]
 
     def backup(self, client: DCOSClient, **kwargs) -> BackupList:  # type: ignore
         bl = BackupList()
