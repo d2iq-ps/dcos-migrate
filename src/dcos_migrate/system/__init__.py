@@ -8,6 +8,10 @@ from .migrator import Migrator
 from .storable_list import StorableList
 
 __all__ = [
+    'Arg',
+    'BoolArg',
+    'DictArg',
+    'ArgParse',
     'BackupList',
     'DCOSClient',
     'Backup',

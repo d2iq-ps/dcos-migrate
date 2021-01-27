@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from dcos_migrate.system import DCOSClient, BackupList, ManifestList, Arg
 
 
@@ -10,10 +10,10 @@ class MigratePlugin(object):
     migrate_depends: List[str] = []
     migrate_data_depends: List[str] = []
 
-    def __init__(self, config={}):
-        self._config_options = []
+    def __init__(self, config: Dict[str, Any] = {}):
+        self._config_options: List[Arg] = []
         self._config = config
-        self._plugin_config = {}
+        self._plugin_config: Optional[Dict[str, Any]] = {}
         if self.plugin_name in config:
             self._plugin_config = config[self.plugin_name]
 
@@ -22,7 +22,7 @@ class MigratePlugin(object):
         return self._config
 
     @config.setter
-    def config(self, config: Dict[str, Any]):
+    def config(self, config: Dict[str, Any]) -> None:
         self._config = config
         self._plugin_config = None
 
@@ -30,7 +30,7 @@ class MigratePlugin(object):
             self._plugin_config = config[self.plugin_name]
 
     @property
-    def plugin_config(self) -> Dict[str, Any]:
+    def plugin_config(self) -> Optional[Dict[str, Any]]:
         return self._plugin_config
 
     @property

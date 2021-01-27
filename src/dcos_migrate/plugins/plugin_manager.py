@@ -107,7 +107,7 @@ class PluginManager(object):
         return self.migrate_data
 
     @property
-    def config_options(self):
+    def config_options(self) -> List[Arg]:
         return self._config_options
 
     @property
@@ -115,7 +115,7 @@ class PluginManager(object):
         return self._config
 
     @config.setter
-    def config(self, config: Dict[str, Any]):
+    def config(self, config: Dict[str, Any]) -> None:
         self._config = config
         for p in self.plugins.values():
             p.config = config
@@ -149,7 +149,7 @@ class PluginManager(object):
 
         self.build_config_options()
 
-    def build_config_options(self):
+    def build_config_options(self) -> None:
         for p in self.plugins.values():
             co = p._config_options
             self._config_options.extend(co)

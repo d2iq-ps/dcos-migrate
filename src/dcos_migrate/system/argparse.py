@@ -1,5 +1,5 @@
 import argparse
-from typing import Dict, Any, Optional, Union, Iterable, Callable
+from typing import Dict, Any, Optional, Union, Iterable, Callable, List
 
 
 class Arg(object):
@@ -9,11 +9,11 @@ class Arg(object):
                  name: str,
                  plugin_name: Optional[str] = None,
                  action: str = 'store',
-                 nargs: Union[int, str] = None,
+                 nargs: Union[int, str, None] = None,
                  epilog: str = '',
                  default: Optional[Any] = None,
-                 type: Union[Callable[[str], Any], Any] = None,
-                 choices: Iterable[Any] = None,
+                 type: Union[Callable[[str], Any], argparse.FileType] = str,
+                 choices: Optional[Iterable[Any]] = None,
                  required: bool = False,
                  help: str = '',
                  metavar: Optional[str] = None):
@@ -49,10 +49,12 @@ class Arg(object):
     def arg_name(self) -> str:
         return "--{}".format(self.arg)
 
-    def add_argument(self, parser: argparse.ArgumentParser):
+    def add_argument(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(self.arg_name, action=self._action,
-                            nargs=self._nargs, default=self._default,
-                            type=self._type, choices=self._choices,
+                            nargs=self._nargs,  # type: ignore
+                            default=self._default,
+                            type=self._type,
+                            choices=self._choices,  # type: ignore
                             required=self._required, help=self._help,
                             metavar=self._metavar)
 
@@ -103,30 +105,31 @@ class DictArg(Arg):
 class ArgParse(object):
     """docstring for ArgParse."""
 
-    def __init__(self, args: list,
+    def __init__(self, args: List[Arg],
                  prog: str = 'dcos_migrate',
-                 parser: argparse.ArgumentParser = None,
+                 parser: Optional[argparse.ArgumentParser] = None,
                  usage: str = '',
                  epilog: str = ''):
         super(ArgParse, self).__init__()
         self.args = args
-        self._parser = parser
         if not parser:
             self._parser = argparse.ArgumentParser(
                 prog=prog, usage=usage, epilog=epilog,
                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        else:
+            self._parser = parser
 
         self.add_args()
 
     @property
-    def parser(self) -> Optional[argparse.ArgumentParser]:
+    def parser(self) -> argparse.ArgumentParser:
         return self._parser
 
     def add_args(self) -> None:
         for a in self.args:
             a.add_argument(self._parser)
 
-    def parse_args(self, args: Optional[list] = None) -> Optional[Dict[str, Any]]:
+    def parse_args(self, args: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
         if not self.parser:
             return None
         parsed_args = self.parser.parse_args(args)
