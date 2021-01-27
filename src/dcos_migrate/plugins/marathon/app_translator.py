@@ -454,7 +454,10 @@ def get_container_translator(
                 ("docker.image", ): translate_image,
                 "docker.parameters": skip_if_equals([]),
                 "docker.privileged": skip_if_equals(False),
-                "docker.pullConfig.secret": skip_if_equals({}),
+                "docker.pullConfig.secret":
+                    lambda dcos_name: Translated(pod_spec_update({'imagePullSecrets': [{
+                        'name': app_secret_mapping.get_image_pull_secret_name(dcos_name)}]})),
+
                 "linuxInfo": skip_if_equals({}),
                 "portMappings": skip_if_equals({}),
                 "volumes": lambda _: translate_volumes(_, app_secret_mapping),
