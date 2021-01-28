@@ -112,6 +112,7 @@ class ArgParse(object):
                  epilog: str = ''):
         super(ArgParse, self).__init__()
         self.args = args
+        self._parser: argparse.ArgumentParser
         if not parser:
             self._parser = argparse.ArgumentParser(
                 prog=prog, usage=usage, epilog=epilog,
@@ -129,9 +130,7 @@ class ArgParse(object):
         for a in self.args:
             a.add_argument(self._parser)
 
-    def parse_args(self, args: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
-        if not self.parser:
-            return None
+    def parse_args(self, args: Optional[List[str]] = None) -> Dict[str, Any]:
         parsed_args = self.parser.parse_args(args)
 
         options: Dict[str, Any] = {}

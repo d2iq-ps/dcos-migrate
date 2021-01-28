@@ -5,6 +5,7 @@ from dcos_migrate.system import Manifest
 import dcos_migrate.utils as utils
 from .backup import Backup
 from .backup_list import BackupList
+from .manifest import Manifest
 from .manifest_list import ManifestList
 
 
@@ -16,7 +17,7 @@ class Migrator(object):
         backup: Optional[Backup] = None,
         backup_list: Optional[BackupList] = None,
         manifest_list: Optional[ManifestList] = None,
-        object: Optional[Any] = None
+        object: Optional[Dict[str, Any]] = None
     ):
         super(Migrator, self).__init__()
         self.backup = backup
@@ -25,7 +26,7 @@ class Migrator(object):
             self.object = backup.data
         self.backup_list = backup_list
         self.manifest_list = manifest_list
-        self.manifest = None
+        self.manifest: Optional[Manifest] = None
 
         self.translate: Dict[str, Callable[[str, str, str], None]] = {}
 

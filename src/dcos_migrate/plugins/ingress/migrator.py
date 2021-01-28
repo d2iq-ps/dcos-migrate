@@ -1,6 +1,7 @@
 #
 
 import warnings
+from typing import Any, Dict, List, Optional, Union
 
 from kubernetes.client import models  # type: ignore
 
@@ -17,7 +18,7 @@ TCP_BACKEND_WARNING = (
 )
 
 
-def migrate_ingress(pool):
+def migrate_ingress(pool: Dict[str, Any]) -> Optional[models.ExtensionsV1beta1Ingress]:
     rules = []
 
     backends = pool.get("backends", {})
@@ -82,7 +83,7 @@ def migrate_ingress(pool):
     return ingress
 
 
-def migrate_lb(pool):
+def migrate_lb(pool: Dict[str, Any]) -> List[models.V1Service]:
     output = []
 
     backends = pool.get("backends", {})
@@ -132,25 +133,31 @@ def migrate_lb(pool):
     return output
 
 
-def migrate(pool):
+def migrate(pool: Dict[str, Any]) -> List[Union[models.ExtensionsV1beta1Ingress, models.V1Service]]:
     # TODO(jkoelker) handle non-ingress ports for http traffic
-    output = [migrate_ingress(pool)]
+    ingress = migrate_ingress(pool)
+    if ingress is None:
+        output = []
+    else:
+        output = [ingress]
     output.extend(migrate_lb(pool))
 
     return output
 
 
 class Ingress(system.Migrator):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super(Ingress, self).__init__(*args, **kwargs)
         self.translate = {
             "name": self.translate_pool,
         }
 
-    def translate_pool(self, key, value, full_path):
+    def translate_pool(self, key: str, value: str, full_path: str) -> None:
+        assert self.object is not None
         objects = migrate(self.object)
 
         cluster_annotations = {}
+        assert self.manifest_list is not None
         cluster_metadata = self.manifest_list.clusterMeta()
         if cluster_metadata is not None and cluster_metadata.annotations:
             cluster_annotations = cluster_metadata.annotations
@@ -163,6 +170,7 @@ class Ingress(system.Migrator):
             manifestName=self.dnsify(value),
         )
 
+        assert self.manifest is not None
         for obj in objects:
             if not obj:
                 continue

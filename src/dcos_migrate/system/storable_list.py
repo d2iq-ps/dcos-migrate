@@ -26,6 +26,7 @@ class StorableList(List[Union[Backup, Manifest]]):
         # ./data/backup/<pluginName>/<backupName>.<class>.<extension>
         out = {}
         for b in self:
+            assert hasattr(b, 'plugin_name'), self
             pname = b.plugin_name
             bname = b.name
             fextension = ".{cls}.{ext}".format(
@@ -60,6 +61,7 @@ class StorableList(List[Union[Backup, Manifest]]):
             raise ValueError("Unknown class: {}".format(className))
 
         d.deserialize(data)
+        assert hasattr(d, 'plugin_name'), d
         self.append(d)
 
     def load(self) -> 'StorableList':

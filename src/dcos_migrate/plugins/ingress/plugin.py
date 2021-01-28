@@ -1,4 +1,5 @@
 #
+from typing import Any
 
 from dcos_migrate.plugins import plugin
 from dcos_migrate import system
@@ -14,7 +15,7 @@ class EdgeLBPlugin(plugin.MigratePlugin):
         self,
         client: system.DCOSClient,
         backupList: system.BackupList,
-        **kwargs
+        **kwargs: Any
     ) -> system.BackupList:
         service_path = "/service/edgelb"
 
@@ -46,7 +47,7 @@ class EdgeLBPlugin(plugin.MigratePlugin):
         self,
         backupList: system.BackupList,
         manifestList: system.ManifestList,
-        **kwargs
+        **kwargs: Any
     ) -> system.ManifestList:
         ml = system.ManifestList()
 

@@ -1,7 +1,7 @@
 #
 
 import warnings
-
+from typing import Any, Dict, Optional
 
 BALANCE_WARNING = (
     "Backend {} uses a haproxy balance method {}, " "forcing to `roundrobin`."
@@ -46,7 +46,7 @@ TCP_WARNING = (
 V1_WARNING = "{}: EdgeLB V1 Pool format detected, only V2 is supported."
 
 
-def parse_backend(backend):
+def parse_backend(backend: Dict[str, Any]) -> Dict[str, Any]:
     name = backend["name"]
     services = backend["services"]
 
@@ -87,7 +87,7 @@ def parse_backend(backend):
     }
 
 
-def parse_map(frontend_name, m):
+def parse_map(frontend_name: str, m: Dict[str, Any]) -> Dict[str, Any]:
     ret = {"backend": m["backend"]}
 
     if "hostReg" in m:
@@ -115,10 +115,10 @@ def parse_map(frontend_name, m):
     return ret
 
 
-def parse_pool(pool):
+def parse_pool(pool: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if pool.get("apiVersion") != "V2":
         warnings.warn(V1_WARNING.format(pool.get("name", "unknown")))
-        return
+        return None
 
     name = pool["name"]
     haproxy = pool["haproxy"]
