@@ -44,5 +44,4 @@ class ManifestList(StorableList):
                      extension=extension)
         b.deserialize(data)
 
-        if b is not None:
-            self.append(b)
+        self.append(b)

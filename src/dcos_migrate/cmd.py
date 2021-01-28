@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from dcos_migrate.system import DCOSClient, BackupList, ManifestList, ArgParse
 from dcos_migrate.plugins.plugin_manager import PluginManager
@@ -10,7 +10,7 @@ from dcos_migrate.plugins.plugin_manager import PluginManager
 class DCOSMigrate(object):
     """docstring for DCOSMigrate."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(DCOSMigrate, self).__init__()
         self.client = DCOSClient()
         self.pm = PluginManager()
@@ -22,15 +22,17 @@ class DCOSMigrate(object):
             usage='Does a backup of your DC/OS cluster and migrates everything into K8s Manifests'
         )
 
-    def run(self, args: Optional[List[str]] = None):
+    def run(self, args: Optional[List[str]] = None) -> None:
         self.handleArgparse(args)
         self.backup()
         self.migrate()
 
-    def handleArgparse(self, args: Optional[List[str]] = None):
+    def handleArgparse(self, args: Optional[List[str]] = None) -> None:
+        if args is None:
+            args = []
         self.pm.config = self.argparse.parse_args(args)
 
-    def backup(self, pluginName=None):
+    def backup(self, pluginName: Optional[str] = None) -> None:
         logging.info("Calling {} Backup Batches".format(
             len(self.pm.backup_batch)))
         for batch in self.pm.backup_batch:
@@ -46,7 +48,7 @@ class DCOSMigrate(object):
 
         self.backup_list.store()
 
-    def backup_data(self, pluginName=None):
+    def backup_data(self, pluginName: Optional[str] = None) -> None:
         # for batch in self.pm.backup_batch:
         #     # each batch could also be executed in parallel.
         #     # But for not just start sequencial
@@ -55,7 +57,7 @@ class DCOSMigrate(object):
         #         self.backup_data_list.extend(blist)
         pass
 
-    def migrate(self, pluginName=None):
+    def migrate(self, pluginName: Optional[str] = None) -> None:
         for batch in self.pm.migrate_batch:
             # each batch could also be executed in parallel.
             # But for not just start sequencial
@@ -67,7 +69,7 @@ class DCOSMigrate(object):
 
         self.manifest_list.store()
 
-    def migrate_data(self, pluginName=None):
+    def migrate_data(self, pluginName: Optional[str] = None) -> None:
         # for batch in self.pm.migrate_batch:
         #     # each batch could also be executed in parallel.
         #     # But for not just start sequencial
@@ -77,10 +79,10 @@ class DCOSMigrate(object):
         #         self.manifest_list.extend(mlist)
         pass
 
-    def get_plugin_names(self):
+    def get_plugin_names(self) -> Iterable[str]:
         return self.pm.plugins.keys()
 
 
-def run():
+def run() -> None:
     logging.basicConfig(level=logging.WARNING)
     DCOSMigrate().run()

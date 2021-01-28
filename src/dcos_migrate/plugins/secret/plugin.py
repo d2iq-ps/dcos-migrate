@@ -9,7 +9,7 @@ import urllib
 import base64
 import logging
 from base64 import b64encode
-from typing import Any, Dict, List
+from typing import cast, Any, Dict, List
 
 
 class DCOSSecretsService:
@@ -27,7 +27,7 @@ class DCOSSecretsService:
         )
         r = self.client.get(u)
         r.raise_for_status()
-        return r.json()['array']
+        return cast(List[str], r.json()['array'])
 
     def get(self, path: str, key: str) -> Dict[str, str]:
         # There are two types of secrets: text and binary.  Using `Accept: */*`
