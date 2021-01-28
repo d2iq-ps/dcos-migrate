@@ -1,6 +1,9 @@
 import pytest
 
 from dcos_migrate.plugins.marathon import app_translator
+from dcos_migrate.plugins.marathon.app_secrets import TrackingAppSecretMapping
+
+from .common import DummyAppSecretMapping
 
 def test_host_path_volumes():
     settings = app_translator.Settings(
@@ -8,7 +11,7 @@ def test_host_path_volumes():
             image=None,
             working_dir=None,
         ),
-        imported_k8s_secret_name = "dummy"
+        app_secret_mapping=DummyAppSecretMapping(),
     )
 
     app = {
@@ -58,7 +61,7 @@ def test_host_path_volume_with_fetch():
             image=None,
             working_dir="/sandbox",
         ),
-        imported_k8s_secret_name = "dummy"
+        app_secret_mapping=DummyAppSecretMapping(),
     )
 
     app = {
@@ -93,13 +96,8 @@ def test_secret_volume_with_host_path():
     One of the main things covered is non-interference between
     generating secret and host path volumes.
     """
-    settings = app_translator.Settings(
-        app_translator.ContainerDefaults(image=None, working_dir=None),
-        imported_k8s_secret_name = "migrated"
-    )
-
     app = {
-        "id": "app",
+        "id": "foobarify",
         "container": {
             "docker": {"image": "python"},
             "volumes": [
@@ -110,6 +108,11 @@ def test_secret_volume_with_host_path():
         "secrets": {"foo": {"source": "bar"}},
     }
 
+    settings = app_translator.Settings(
+        app_translator.ContainerDefaults(image=None, working_dir=None),
+        app_secret_mapping=TrackingAppSecretMapping(app['id'], app['secrets']),
+    )
+
     result, warnings = app_translator.translate_app(app, settings)
 
     template_spec = result['spec']['template']['spec']
@@ -117,9 +120,9 @@ def test_secret_volume_with_host_path():
     volumes = sorted(template_spec['volumes'], key = lambda v: v['name'])
     assert volumes == [
         {
-            "name": "secrets-migrated",
+            "name": "secrets-marathonsecret-foobarify",
             "secret": {
-                "secretName": "migrated",
+                "secretName": "marathonsecret-foobarify",
                 "items": [{"key": "bar", "path": "bar", "mode": 0o777}],
             }
         },
@@ -128,8 +131,8 @@ def test_secret_volume_with_host_path():
 
     mounts = sorted(template_spec['containers'][0]['volumeMounts'], key = lambda v: v['name'])
     assert mounts == [
-        {"name": "secrets-migrated", "mountPath": "/secret", "subPath": "bar", "readOnly": True},
-        {"name": "volume-0", "mountPath": "/non-interfering", "readOnly": True},
+        {"name": volumes[0]['name'], "mountPath": "/secret", "subPath": "bar", "readOnly": True},
+        {"name": volumes[1]['name'], "mountPath": "/non-interfering", "readOnly": True},
     ]
 
 
@@ -139,13 +142,8 @@ def test_multiple_secret_volumes():
     One of the main things covered is non-interference between
     generating secret and host path volumes.
     """
-    settings = app_translator.Settings(
-        app_translator.ContainerDefaults(image=None, working_dir=None),
-        imported_k8s_secret_name = "migrated"
-    )
-
     app = {
-        "id": "app",
+        "id": "foobarify",
         "container": {
             "docker": {"image": "python"},
             "volumes": [
@@ -161,15 +159,20 @@ def test_multiple_secret_volumes():
         },
     }
 
+    settings = app_translator.Settings(
+        app_translator.ContainerDefaults(image=None, working_dir=None),
+        app_secret_mapping=TrackingAppSecretMapping(app['id'], app['secrets']),
+    )
+
     result, warnings = app_translator.translate_app(app, settings)
 
     template_spec = result['spec']['template']['spec']
 
     volumes = sorted(template_spec['volumes'], key = lambda v: v['name'])
     assert volumes == [{
-        "name": "secrets-migrated",
+        "name": "secrets-marathonsecret-foobarify",
         "secret": {
-            "secretName": "migrated",
+            "secretName": "marathonsecret-foobarify",
             "items": [
                 {"key": "foo", "path": "foo", "mode": 0o777},
                 {"key": "bar", "path": "bar", "mode": 0o777},
@@ -178,9 +181,11 @@ def test_multiple_secret_volumes():
         }
     }]
 
+    name = volumes[0]['name']
+
     mounts = sorted(template_spec['containers'][0]['volumeMounts'], key = lambda v: v['name'])
     assert mounts == [
-        {"name": "secrets-migrated", "mountPath": "/etc/foo", "subPath": "foo", "readOnly": True},
-        {"name": "secrets-migrated", "mountPath": "/run/bar", "subPath": "bar", "readOnly": True},
-        {"name": "secrets-migrated", "mountPath": "/var/baz", "subPath": "baz", "readOnly": True},
+        {"name": name, "mountPath": "/etc/foo", "subPath": "foo", "readOnly": True},
+        {"name": name, "mountPath": "/run/bar", "subPath": "bar", "readOnly": True},
+        {"name": name, "mountPath": "/var/baz", "subPath": "baz", "readOnly": True},
     ]

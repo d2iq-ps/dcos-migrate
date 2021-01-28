@@ -1,6 +1,7 @@
 import pytest
 
 from dcos_migrate.plugins.marathon import app_translator
+from .common import DummyAppSecretMapping
 
 def test_generated_fetch_layout():
     """
@@ -13,7 +14,7 @@ def test_generated_fetch_layout():
             image="busybox",
             working_dir="/fetched_artifacts",
         ),
-        imported_k8s_secret_name = "dummy"
+        app_secret_mapping=DummyAppSecretMapping(),
     )
 
     fields = {"id": "app", "fetch": [{"uri": "http://foobar.baz/0xdeadbeef"}]}
@@ -47,7 +48,7 @@ def test_fetch_fails_without_working_dir():
             image="busybox",
             working_dir=None,
         ),
-        imported_k8s_secret_name = "dummy"
+        app_secret_mapping=DummyAppSecretMapping(),
     )
 
     fields = {"id": "app", "fetch": [{"uri": "http://foobar.baz/0xdeadbeef"}]}

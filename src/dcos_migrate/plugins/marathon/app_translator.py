@@ -6,11 +6,11 @@ import os.path
 import dcos_migrate.utils as utils
 
 from collections import namedtuple
-from typing import List, Mapping, Union
+from typing import List, Mapping, NamedTuple, Optional, Union
 
 import dcos_migrate.utils as utils
 
-from .app_secrets import AppSecretMapping, MonolithicAppSecretMapping
+from .app_secrets import AppSecretMapping
 
 from .common import pod_spec_update, main_container, try_oneline_dump
 from .common import InvalidAppDefinition, AdditionalFlagNeeded
@@ -20,9 +20,15 @@ from .mapping_utils import ListExtension, finalize_unmerged_list_extensions
 from .volumes import translate_volumes
 
 
-Settings = namedtuple('Settings', ['container_defaults', 'imported_k8s_secret_name'])
+class ContainerDefaults(NamedTuple):
+    image: Optional[str]
+    working_dir: Optional[str]
 
-ContainerDefaults = namedtuple('ContainerDefaults', ['image', 'working_dir'])
+
+class Settings(NamedTuple):
+    container_defaults: ContainerDefaults
+    app_secret_mapping: AppSecretMapping
+
 
 log = logging.getLogger(__name__) #pylint: disable=invalid-name
 
@@ -448,7 +454,10 @@ def get_container_translator(
                 ("docker.image", ): translate_image,
                 "docker.parameters": skip_if_equals([]),
                 "docker.privileged": skip_if_equals(False),
-                "docker.pullConfig.secret": skip_if_equals({}),
+                "docker.pullConfig.secret":
+                    lambda dcos_name: Translated(pod_spec_update({'imagePullSecrets': [{
+                        'name': app_secret_mapping.get_image_pull_secret_name(dcos_name)}]})),
+
                 "linuxInfo": skip_if_equals({}),
                 "portMappings": skip_if_equals({}),
                 "volumes": lambda _: translate_volumes(_, app_secret_mapping),
@@ -507,8 +516,8 @@ def translate_app(app: dict, settings: Settings):
 
     mapping = generate_root_mapping(
         settings.container_defaults,
-        MonolithicAppSecretMapping(app, settings.imported_k8s_secret_name),
-        error_location,
+        settings.app_secret_mapping,
+        error_location
     )
 
     try:

@@ -2,12 +2,15 @@ import pytest
 
 from dcos_migrate.plugins.marathon import app_translator
 
+from .common import DummyAppSecretMapping
+
+
 EMPTY_SETTINGS = app_translator.Settings(
     app_translator.ContainerDefaults(
         image="busybox",
         working_dir=None,
     ),
-    imported_k8s_secret_name = None
+    app_secret_mapping=DummyAppSecretMapping(),
 )
 
 
