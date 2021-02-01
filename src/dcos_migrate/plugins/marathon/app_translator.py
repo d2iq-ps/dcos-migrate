@@ -276,6 +276,66 @@ def skip_if_equals(default):
         )])
 
 
+def translate_unreachable_strategy(strategy: Union[dict, str]) -> Translated:
+    if isinstance(strategy, str):
+        if strategy != "disabled":
+            raise InvalidAppDefinition('Invalid "unreachableStatregy": {}'.format(strategy))
+
+        return Translated(
+            update=pod_spec_update({"tolerations": ListExtension([{
+                "key": "node.kubernetes.io/unreachable",
+                "operator": "Exists",
+                "effect": "NoExecute",
+            }])}),
+            warnings=['"unreachableStatregy" has been set to "disabled"']
+        )
+
+
+    fields = strategy.copy()
+    try:
+        inactive_after_seconds = fields.pop("inactiveAfterSeconds")
+        expunge_after_seconds = fields.pop("expungeAfterSeconds")
+    except KeyError as key:
+        raise InvalidAppDefinition('"unreachableStatregy" missing {}'.format(key))
+
+    if fields:
+        return Translated(warnings=["Unknown fields: {}".format(try_oneline_dump(fields))])
+
+    return Translated(
+        update=pod_spec_update({"tolerations": ListExtension([{
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "effect": "NoExecute",
+            "tolerationSeconds": expunge_after_seconds,
+        }])}),
+        warnings=[] if expunge_after_seconds == inactive_after_seconds else \
+            ['A value of "inactiveAfterSeconds" ({}) different from that of "expungeAfterSeconds"'
+             ' ({}) has been ignored'.format(inactive_after_seconds, expunge_after_seconds)],
+    )
+
+
+def translate_upgrade_strategy(strategy: dict) -> Translated:
+    fields = strategy.copy()
+    try:
+        maximum_over_capacity = fields.pop("maximumOverCapacity")
+        minimum_health_capacity = fields.pop("minimumHealthCapacity")
+    except KeyError as key:
+        raise InvalidAppDefinition('"upgradeStatregy" missing {}'.format(key))
+
+    if fields:
+        return Translated(warnings=["Unknown fields: {}".format(try_oneline_dump(fields))])
+
+    return Translated(
+        update={"spec": {"strategy": {
+            "type": "RollingUpdate",
+            "rollingUpdate": {
+                "maxUnavailable": "{}%".format(int(100.0 * (1.0 - minimum_health_capacity))),
+                "maxSurge": "{}%".format(int(100.0 * maximum_over_capacity))
+            }}}},
+        warnings=[]
+    )
+
+
 def generate_root_mapping(
         container_defaults: ContainerDefaults,
         app_secrets_mapping: AppSecretMapping,
@@ -326,16 +386,16 @@ def generate_root_mapping(
         # 'secrets' do not map to anything and are used only in combination with other fields.
         'secrets': skip_quietly,
 
-        'taskKillGracePeriodSeconds': not_translatable,
+        'taskKillGracePeriodSeconds':
+            lambda t: Translated(pod_spec_update({'terminationGracePeriodSeconds': t})),
 
         'tasksHealthy': skip_quietly,
         'tasksRunning': skip_quietly,
         'tasksStaged': skip_quietly,
         'tasksUnhealthy': skip_quietly,
 
-        'unreachableStrategy': not_translatable,
-
-        'upgradeStrategy': not_translatable,
+        'unreachableStrategy': translate_unreachable_strategy,
+        'upgradeStrategy': translate_upgrade_strategy,
 
         'user': skip_if_equals("nobody"),
 

@@ -130,3 +130,39 @@ def test_env_secret():
                 'name': 'marathonsecret-foobarify',
                 'key': 'deadbeef.baz',
             }}}]
+
+
+def test_unreachable_strategy():
+    settings = new_settings()
+    app = {"id":"app", "unreachableStrategy": {"inactiveAfterSeconds": 123, "expungeAfterSeconds": 456}}
+    result, warnings = app_translator.translate_app(app, settings)
+    tolerations = result['spec']['template']['spec']['tolerations']
+
+    # This test implicitly relies on the fact that "unreachableStartegy"
+    # is the only thing that can result in tolerations being set.
+    assert tolerations == [{
+        'effect': 'NoExecute',
+        'key': 'node.kubernetes.io/unreachable',
+        'operator': 'Exists',
+        'tolerationSeconds': 456
+    }]
+
+    assert any("inactiveAfterSeconds" in w and "123" in w for w in warnings)
+
+
+def test_upgrade_strategy():
+    settings = new_settings()
+    app = {"id":"app", "upgradeStrategy": {"minimumHealthCapacity": 0.6250, "maximumOverCapacity": 0.455}}
+    result, _ = app_translator.translate_app(app, settings)
+
+    assert result['spec']['strategy'] == {
+        "type": "RollingUpdate",
+        "rollingUpdate": {"maxUnavailable": "37%", "maxSurge": "45%"}
+    }
+
+
+def test_task_kill_grace_period_seconds():
+    settings = new_settings()
+    app = {"id":"app", "taskKillGracePeriodSeconds": 123}
+    result, _ = app_translator.translate_app(app, settings)
+    assert result['spec']['template']['spec']['terminationGracePeriodSeconds'] == 123
