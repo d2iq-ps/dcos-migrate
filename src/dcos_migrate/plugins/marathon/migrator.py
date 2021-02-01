@@ -1,4 +1,4 @@
-from dcos_migrate.system import Manifest, ManifestList, Migrator
+from dcos_migrate.system import Manifest, ManifestList, Migrator, with_comment
 import dcos_migrate.utils as utils
 from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret  # type: ignore
 from kubernetes.client import ApiClient  # type: ignore
@@ -10,6 +10,9 @@ from .common import InvalidAppDefinition
 import logging
 from typing import Optional
 
+@with_comment
+class V1DeploymentWithComment(V1Deployment):
+    pass
 
 class MarathonMigrator(Migrator):
     """docstring for MarathonMigrator."""
@@ -31,10 +34,12 @@ class MarathonMigrator(Migrator):
 
         self.manifest = Manifest(
             pluginName="marathon", manifestName=self.dnsify(value))
-        app, warning = translate_app(self.object, settings)
+        app, warnings = translate_app(self.object, settings)
 
         kc = ApiClient()
-        dapp = kc._ApiClient__deserialize(app, V1Deployment)
+        dapp = kc._ApiClient__deserialize(app, V1DeploymentWithComment)
+        dapp.set_comment(warnings)
+
         self.manifest.append(dapp)
 
         for remapping in self._secret_mapping.get_secrets_to_remap():

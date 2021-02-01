@@ -1,9 +1,52 @@
 import yaml
 import logging
 import inspect
-from typing import Any, List, Optional
+import itertools
+
+from typing import Any, Iterable, List, Optional, Type
+
 from kubernetes.client import ApiClient  # type: ignore
 import kubernetes.client.models  # type: ignore
+
+
+def with_comment(object_cls: Type[object]) -> Type[object]:
+    """
+    This can be used as a class decorator:
+    @with_comment
+    class V1ServiceWithComment(V1Service):
+        pass
+
+    def create_service():
+        return V1ServiceWithComment().set_comment(['This is an empty service']))
+
+    def print_comment(service:V1ServiceWithComment):
+        print('\n'.join(service.get_comment()))
+    """
+    for method in ('set_comment', 'get_comment'):
+        if any(k == method for k, _ in inspect.getmembers(object_cls)):
+            raise Exception("{} already defines '{}'".format(object_cls.__name__, method))
+
+    class ObjectWithComment(object_cls): # type: ignore # https://github.com/python/mypy/issues/5865
+        def set_comment(self, comment: Iterable[str]) -> None:
+            self.__comment = comment
+
+        def get_comment(self) -> Iterable[str]:
+            try:
+                return self.__comment
+            except AttributeError:
+                return []
+
+    return ObjectWithComment
+
+def _extract_comment(obj: Any) -> str:
+    try:
+        get_comment = obj.get_comment
+    except AttributeError:
+        return ""
+
+    pieces = get_comment()
+    lines_iter = itertools.chain.from_iterable(p.splitlines() for p in pieces)
+    return '\n'.join('# ' + line for line in lines_iter)
 
 
 class Manifest(List[Any]):
@@ -32,7 +75,8 @@ class Manifest(List[Any]):
                       'spec', 'data', 'stringData']:
                 if k in doc.keys():
                     orderedDoc[k] = doc[k]
-            document = yaml.dump(orderedDoc, sort_keys=False)
+
+            document = _extract_comment(d) + yaml.dump(orderedDoc, sort_keys=False)
             logging.debug("Found doc: {}".format(document))
             docs.append(document)
 
