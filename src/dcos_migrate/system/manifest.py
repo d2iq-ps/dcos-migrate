@@ -38,6 +38,7 @@ def with_comment(object_cls: Type[object]) -> Type[object]:
 
     return ObjectWithComment
 
+
 def _extract_comment(obj: Any) -> str:
     try:
         get_comment = obj.get_comment
@@ -46,7 +47,7 @@ def _extract_comment(obj: Any) -> str:
 
     pieces = get_comment()
     lines_iter = itertools.chain.from_iterable(p.splitlines() for p in pieces)
-    return '\n'.join('# ' + line for line in lines_iter)
+    return ''.join('# {}\n'.format(line) for line in lines_iter)
 
 
 class Manifest(List[Any]):
