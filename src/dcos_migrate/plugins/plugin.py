@@ -60,7 +60,7 @@ class MigratePlugin(object):
     def backup_data(self, client: DCOSClient, backupList: BackupList, backupFolder: str, **kwargs: Any) -> None:
         """
         backup_data gets the DCOSCLient and a folder path. The data functions are
-        less restrict about the actual data in and outputs due to the huge difference
+        less restrictive about the actual data in and outputs due to the huge difference
         from plugin to plugin.
 
         Plugins are expected to create at least a subfolder in backupFolder with their
@@ -72,10 +72,10 @@ class MigratePlugin(object):
         self, backupList: BackupList, manifestList: ManifestList, **kwargs: Any
     ) -> ManifestList:
         """
-        migrate gets the comple list of backups BackupList and the list of all
+        migrate gets the complete list of backups BackupList and the list of all
         previously made Manifests in ManifestList.
 
-        migrate must return a ManifestList with the Manifests if this plugin.
+        migrate must return a ManifestList with the Manifests of this plugin.
         """
         pass
 
@@ -83,7 +83,7 @@ class MigratePlugin(object):
             self, backupList: BackupList, manifestList: ManifestList, backupFolder: str, migrateFolder: str, **kwargs: Any) -> None:
         """
         migrate_data gets the backupList, ManifestList, backupFolder and a folder path.
-        The data functions are less restrict about the actual data in and outputs due to
+        The data functions are less restrictive about the actual data in and outputs due to
         the huge difference from plugin to plugin.
 
         Plugins are expected to create at least a subfolder in migrateFolder with their
