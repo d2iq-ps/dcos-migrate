@@ -2,23 +2,13 @@ import json
 import logging
 import os.path
 
-
-import dcos_migrate.utils as utils
-
-from collections import namedtuple
-from typing import List, Mapping, NamedTuple, Optional, Union
-
-import dcos_migrate.utils as utils
-
 from .app_secrets import AppSecretMapping
-
-from .common import pod_spec_update, main_container, try_oneline_dump
-from .common import InvalidAppDefinition, AdditionalFlagNeeded
-
-from .mapping_utils import Translated, apply_mapping
-from .mapping_utils import ListExtension, finalize_unmerged_list_extensions
+from .common import InvalidAppDefinition, AdditionalFlagNeeded, pod_spec_update, main_container, try_oneline_dump
+from .mapping_utils import ListExtension, finalize_unmerged_list_extensions, Translated, apply_mapping
+from .network_helpers import get_ports_from_app, effective_port, AppPort
 from .volumes import translate_volumes
-
+from typing import List, Mapping, NamedTuple, Optional, Union, Sequence
+import dcos_migrate.utils as utils
 
 class ContainerDefaults(NamedTuple):
     image: Optional[str]
@@ -86,6 +76,7 @@ def translate_resources(fields):
 def translate_env(
         env: Mapping[str, Union[dict, str]],
         app_secret_mapping: AppSecretMapping,
+        network_ports: Sequence[AppPort]
     ):
     translated: List[dict] = []
     not_translated = {}
@@ -110,6 +101,17 @@ def translate_env(
                 },
             },
         })
+
+    if len(network_ports) > 0:
+        all_ports = [str(effective_port(p)) for p in network_ports]
+
+        translated.append({"name": "PORTS", "value": ",".join(all_ports)})
+        for app_port in network_ports:
+            port = effective_port(app_port)
+
+            translated.append({"name": "PORT" + str(app_port.idx), "value": str(port)})
+            if app_port.name:
+                translated.append({"name": "PORT_" + app_port.name, "value": str(port)})
 
     return Translated(
         update=main_container({'env': translated}),
@@ -340,6 +342,7 @@ def generate_root_mapping(
         container_defaults: ContainerDefaults,
         app_secrets_mapping: AppSecretMapping,
         error_location: str,
+        network_ports: Sequence[AppPort],
     ):
 
     return {
@@ -359,7 +362,7 @@ def generate_root_mapping(
 
         'deployments': skip_quietly,
 
-        'env': lambda env: translate_env(env, app_secrets_mapping),
+        ('env', ): lambda fields: translate_env(fields.get("env", {}), app_secrets_mapping, network_ports),
 
         'executor': skip_if_equals(""),
 
@@ -519,7 +522,7 @@ def get_container_translator(
                         'name': app_secret_mapping.get_image_pull_secret_name(dcos_name)}]})),
 
                 "linuxInfo": skip_if_equals({}),
-                "portMappings": skip_if_equals({}),
+                "portMappings": skip_quietly,
                 "volumes": lambda _: translate_volumes(_, app_secret_mapping),
                 "type": skip_quietly,
             },
@@ -574,10 +577,13 @@ def load(path: str):
 def translate_app(app: dict, settings: Settings):
     error_location = "app " + app.get('id', '(NO ID)')
 
+    network_ports = get_ports_from_app(app)
+
     mapping = generate_root_mapping(
         settings.container_defaults,
         settings.app_secret_mapping,
-        error_location
+        error_location,
+        network_ports
     )
 
     try:

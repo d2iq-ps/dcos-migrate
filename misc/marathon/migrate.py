@@ -6,16 +6,25 @@
 
 import argparse
 import logging
-import os.path
-import re
 import sys
 
 # This script relies on python-yaml installed via pip, system package manager or some other means.
 import yaml
 
-from lib.app_translator import ContainerDefaults, Settings, load, translate_app
+from dcos_migrate.plugins.marathon.app_translator import ContainerDefaults, Settings, load, translate_app
+from dcos_migrate.plugins.marathon.service_translator import translate_service
+from dcos_migrate.plugins.marathon import app_secrets
+
+
+class DummyAppSecretMapping(app_secrets.AppSecretMapping):
+    def get_reference(self):
+        raise NotImplementedError()
+
+    def get_image_pull_secret_name(self):
+        raise NotImplementedError()
 
 log = logging.getLogger(__name__) #pylint: disable=invalid-name
+
 
 def translate(path: str, settings: Settings, selected_app_id):
     apps = load(path)
@@ -28,6 +37,12 @@ def translate(path: str, settings: Settings, selected_app_id):
 
         if dcos_package_name is None:
             result, warnings = translate_app(app, settings)
+            print("# Converted from an app {}".format(app_id))
+            print("\n\n".join([''] + warnings).replace('\n', '\n# '))
+            print(yaml.safe_dump(result))
+            print("---")
+
+            result, warnings = translate_service(app)
             print("# Converted from an app {}".format(app_id))
             print("\n\n".join([''] + warnings).replace('\n', '\n# '))
             print(yaml.safe_dump(result))
@@ -61,19 +76,13 @@ def main():
              " Files from Marathon app's `fetch` will be downloaded there by a generated init container."
     )
 
-    translate_cmd.add_argument(
-        "--imported-k8s-secret-name",
-        type=str,
-        help="Name of the K8s secret into which the DCOS secrets have been imported"
-    )
-
     def translate_func(args):
         settings = Settings(
             container_defaults=ContainerDefaults(
                 image=args.default_image,
                 working_dir=args.working_dir,
             ),
-            imported_k8s_secret_name=args.imported_k8s_secret_name
+            app_secret_mapping=DummyAppSecretMapping()
         )
 
         return translate(args.path, settings, args.app_id)

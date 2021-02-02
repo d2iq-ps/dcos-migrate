@@ -1,12 +1,10 @@
-import os
-import sys
-
 import pytest
 
 from dcos_migrate.plugins.marathon import app_translator
 from dcos_migrate.plugins.marathon.app_secrets import TrackingAppSecretMapping
 
 from .common import DummyAppSecretMapping
+from typing import Sequence
 
 
 def new_settings(image: str = "busybox"):
@@ -17,7 +15,6 @@ def new_settings(image: str = "busybox"):
         ),
         app_secret_mapping=DummyAppSecretMapping(),
     )
-
 
 
 def test_happy_path_sleeper():
@@ -73,7 +70,7 @@ def test_happy_path_sleeper():
 ])
 def test_resource_requests_and_limits(app_resource_fields, expected_k8s_resources):
     settings = new_settings()
-    app = {"id":"app"}
+    app = {"id": "app"}
     app.update(app_resource_fields)
     result, _ = app_translator.translate_app(app, settings)
     resources = result['spec']['template']['spec']['containers'][0]['resources']
@@ -118,7 +115,6 @@ def test_env_secret():
         app_translator.ContainerDefaults(image="lazybox", working_dir=None),
         app_secret_mapping=TrackingAppSecretMapping(app['id'], app['secrets']),
     )
-
 
     result, _ = app_translator.translate_app(app, settings)
     env = result['spec']['template']['spec']['containers'][0]['env']
@@ -166,3 +162,36 @@ def test_task_kill_grace_period_seconds():
     app = {"id":"app", "taskKillGracePeriodSeconds": 123}
     result, _ = app_translator.translate_app(app, settings)
     assert result['spec']['template']['spec']['terminationGracePeriodSeconds'] == 123
+
+
+def __entries_list_to_dict(entries: Sequence[dict]) -> dict:
+    result = {}
+    for e in entries:
+        result[e['name']] = e['value']
+
+    return result
+
+
+def test_translate_network_ports_env_vars():
+    app = {
+        "id": "nginx",
+        "instances": 2,
+        "container": {
+            "type": "DOCKER",
+            "docker": {"image": "nginx:1.14.2"},
+            "portMappings": [{
+                "name": "http",
+                "hostPort": 0,
+                "containerPort": 80,
+                "labels": {
+                    "VIP_0": "nginx:80"
+                }
+            }]
+        }
+    }
+    settings = new_settings()
+    result, warnings = app_translator.translate_app(app, settings)
+    container = result['spec']['template']['spec']['containers'][0]
+
+    resulting_env = __entries_list_to_dict(container['env'])
+    assert (resulting_env == {'PORTS': '80', 'PORT0': '80', 'PORT_http': '80'})
