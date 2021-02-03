@@ -12,13 +12,12 @@ pipeline {
     DCOS_EE_URL = credentials('0b513aad-e0e0-4a82-95f4-309a80a02ff9')
   }
   stages {
-    stage("Tox") {
+    stage("ci") {
       agent {
-        label "py37"
+        label "s3"
       }
       steps {
-        sh 'pip install tox'
-        sh 'tox'
+        sh 'bin/ci'
       }
     }
   }

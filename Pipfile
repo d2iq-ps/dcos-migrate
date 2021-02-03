@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+jsonpath-ng = "==1.5.2"
+dcos = "==0.6.1"
+kubernetes = "*"
+requests = "*"
+
+[dev-packages]
+pytest = "*"
+mypy = "*"
+requests-mock = "*"
+pytest-snapshot = "*"
+
+[requires]
+python_version = "3.8"

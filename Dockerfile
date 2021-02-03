@@ -1,6 +1,11 @@
-FROM python:3.8.6
+ARG PYTHON_VERSION
+FROM python:$PYTHON_VERSION
 
-WORKDIR /workdir
-ADD ./ /workdir
-RUN pip install .
-ENTRYPOINT ["/usr/local/bin/dcos-migrate"]
+RUN pip install pipenv
+
+ENV PYTHONPATH=/dcos-migrate/src
+WORKDIR /dcos-migrate
+ADD ./ /dcos-migrate
+RUN python -m pipenv install --system
+
+ENTRYPOINT ["/dcos-migrate/src/dcos-migrate.py"]
