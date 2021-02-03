@@ -1,10 +1,9 @@
 import abc
-import re
 from typing import Dict, Mapping, NamedTuple, Optional, Sequence
 
 import dcos_migrate.utils as utils
 
-from .common import InvalidAppDefinition, AdditionalFlagNeeded
+from .common import InvalidAppDefinition
 
 
 class SecretReference(NamedTuple):
@@ -43,6 +42,7 @@ class TrackingAppSecretMapping(AppSecretMapping):
     Tracks which secrets are used by callers of `AppSecretMapping` interface
     and reports them via `get_secrets_to_remap()`.
     """
+
     def __init__(
         self,
         app_id: str,
@@ -75,7 +75,6 @@ class TrackingAppSecretMapping(AppSecretMapping):
         k8s_key = self.__get_k8s_secret_key(app_secret_name)
         self._generic_remapping.key_mapping[k8s_key] = k8s_key
         return SecretReference(self._generic_remapping.dest_name, k8s_key)
-
 
     def get_image_pull_secret_name(self, app_secret_name: str) -> str:
         k8s_key = self.__get_k8s_secret_key(app_secret_name)

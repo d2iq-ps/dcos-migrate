@@ -25,8 +25,7 @@ endif
 # ----------------------------
 
 mypy: | setup
-	$(PREFIX) mypy src && \
-	$(PREFIX) mypy --strict --warn-unused-ignores src/dcos-migrate.py src/dcos_migrate/cmd.py src/dcos_migrate/system src/dcos_migrate/utils src/dcos_migrate/plugins/plugin.py src/dcos_migrate/plugins/plugin_manager.py src/dcos_migrate/plugins/cluster src/dcos_migrate/plugins/ingress src/dcos_migrate/plugins/secret
+	$(PREFIX) mypy --strict --warn-unused-ignores src
 
 test: | setup
 	$(PREFIX) pytest tests/

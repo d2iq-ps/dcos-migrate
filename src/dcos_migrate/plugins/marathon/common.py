@@ -1,4 +1,5 @@
 import json
+from typing import Any, Dict
 
 
 class AdditionalFlagNeeded(Exception):
@@ -13,11 +14,11 @@ class InvalidAppDefinition(Exception):
     pass
 
 
-def pod_spec_update(fields):
+def pod_spec_update(fields: Dict[str, Any]) -> Dict[str, Any]:
     return {'spec': {'template': {'spec': fields}}}
 
 
-def main_container(fields):
+def main_container(fields: Dict[str, Any]) -> Dict[str, Any]:
     # NOTE: All updates for the main container set the same "name" field.
     assert 'name' not in fields
     _fields = {'name': 'main'}
@@ -26,6 +27,6 @@ def main_container(fields):
     return pod_spec_update({'containers': [_fields]})
 
 
-def try_oneline_dump(obj):
+def try_oneline_dump(obj: Any) -> str:
     dump = json.dumps(obj)
     return dump if len(dump) <= 78 else json.dumps(obj, indent=2)

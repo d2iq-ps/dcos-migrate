@@ -5,20 +5,21 @@ from kubernetes.client import ApiClient  # type: ignore
 
 from .app_translator import ContainerDefaults, translate_app, Settings
 from .app_secrets import TrackingAppSecretMapping, SecretRemapping
-from .common import InvalidAppDefinition
 
-import logging
-from typing import Optional
+from typing import Any, Optional
+
 
 @with_comment
-class V1DeploymentWithComment(V1Deployment):
+class V1DeploymentWithComment(V1Deployment):  # type: ignore
     pass
+
 
 class MarathonMigrator(Migrator):
     """docstring for MarathonMigrator."""
 
-    def __init__(self, **kw):
+    def __init__(self, **kw: Any):
         super(MarathonMigrator, self).__init__(**kw)
+        assert self.object is not None
         self._secret_mapping = TrackingAppSecretMapping(
             self.object['id'], self.object.get('secrets', {}))
 
@@ -26,7 +27,7 @@ class MarathonMigrator(Migrator):
             "id": self.translate_marathon,
         }
 
-    def translate_marathon(self, key, value, full_path):
+    def translate_marathon(self, key: str, value: str, full_path: str) -> None:
         settings = Settings(
             container_defaults=ContainerDefaults("alpine:latest", "/"),
             app_secret_mapping=self._secret_mapping,
@@ -34,6 +35,7 @@ class MarathonMigrator(Migrator):
 
         self.manifest = Manifest(
             pluginName="marathon", manifestName=self.dnsify(value))
+        assert self.object is not None
         app, warnings = translate_app(self.object, settings)
 
         kc = ApiClient()
@@ -53,7 +55,7 @@ class NoMigratedSecretFound(RuntimeError):
 
 
 def _create_remapped_secret(
-    manifest_list: ManifestList,
+    manifest_list: Optional[ManifestList],
     remapping: SecretRemapping,
     app_id: str,
 ) -> Optional[V1Secret]:
@@ -61,6 +63,7 @@ def _create_remapped_secret(
     if not remapping.key_mapping:
         return None
 
+    assert manifest_list is not None
     clusterMeta: Optional[V1ObjectMeta] = manifest_list.clusterMeta()
 
     metadata = V1ObjectMeta(annotations={})

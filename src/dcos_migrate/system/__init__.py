@@ -17,6 +17,7 @@ __all__ = [
     'Backup',
     'ManifestList',
     'Manifest',
+    'with_comment',
     'Migrator',
     'StorableList',
 ]

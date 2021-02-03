@@ -4,6 +4,7 @@ from dcos_migrate.plugins.secret import SecretPlugin
 from dcos_migrate.system import DCOSClient, BackupList, Backup, ManifestList, DictArg, Arg
 from .migrator import MarathonMigrator
 import logging
+from typing import Any, Dict
 
 
 class MarathonPlugin(MigratePlugin):
@@ -12,13 +13,13 @@ class MarathonPlugin(MigratePlugin):
     plugin_name = "marathon"
     migrate_depends = [ClusterPlugin.plugin_name, SecretPlugin.plugin_name]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(MarathonPlugin, self).__init__()
         # TODO: returned config is not yet used
         self._config_options = [DictArg(
             "secretoverwrite", plugin_name=self.plugin_name,
             metavar='DCOS_SECRET=K8s_SECRET',
-            help='Map DC/OS secrets to a different K8s secret. K8s data key must equal DC/OS secret name'
+            help='Map DC/OS secrets to a different K8s secret. K8s data key must equal DC/OS secret name'  # noqa
         ), Arg(
             "image", plugin_name=self.plugin_name,
             default="alpine:latest",
@@ -39,12 +40,14 @@ class MarathonPlugin(MigratePlugin):
 
         return bl
 
-    def createBackup(self, app) -> Backup:
+    def createBackup(self, app: Dict[str, Any]) -> Backup:
         return Backup(pluginName=self.plugin_name,
                       backupName=Backup.renderBackupName(app['id']),
                       data=app)
 
-    def migrate(self, backupList: BackupList, manifestList: ManifestList, **kwargs) -> ManifestList:
+    def migrate(
+        self, backupList: BackupList, manifestList: ManifestList, **kwargs: Any
+    ) -> ManifestList:
         ml = ManifestList()
 
         for b in backupList.backups(pluginName=self.plugin_name):

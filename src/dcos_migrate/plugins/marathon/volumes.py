@@ -1,13 +1,15 @@
 import abc
 from collections import defaultdict
-from typing import List, Mapping
+from typing import Any, Dict, Iterator, List, Mapping
 
 from .app_secrets import AppSecretMapping
 from .common import InvalidAppDefinition, main_container, pod_spec_update, try_oneline_dump
 from .mapping_utils import ListExtension, Translated
 
 
-def translate_volumes(volumes, app_secrets: AppSecretMapping):
+def translate_volumes(
+    volumes: Iterator[Dict[str, Any]], app_secrets: AppSecretMapping
+) -> Translated:
     mappers = [_HostPathVolumeMapper(), _SecretVolumeMapper(app_secrets)]
 
     result = Translated()
@@ -35,7 +37,7 @@ class _VolumeMapper(object):
         pass
 
     @abc.abstractmethod
-    def consume(self, volume: dict) -> bool:
+    def consume(self, volume: Dict[str, Any]) -> bool:
         """
         Called for each volume in the app.
 
@@ -46,12 +48,12 @@ class _VolumeMapper(object):
 
 
 class _HostPathVolumeMapper(_VolumeMapper):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._result = Translated()
         self._index = 0
 
-    def consume(self, volume) -> bool:
+    def consume(self, volume: Dict[str, Any]) -> bool:
         fields = volume.copy()
         try:
             container_path = fields.pop('containerPath')
@@ -105,7 +107,7 @@ class _SecretVolumeMapper(_VolumeMapper):
     def secret_volume_name(k8s_secret_name: str) -> str:
         return 'secrets-' + k8s_secret_name
 
-    def consume(self, volume) -> bool:
+    def consume(self, volume: Dict[str, Any]) -> bool:
         fields = volume.copy()
         try:
             container_path = fields.pop("containerPath")

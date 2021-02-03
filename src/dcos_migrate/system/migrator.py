@@ -1,7 +1,6 @@
 import logging
 from jsonpath_ng.ext import parse  # type: ignore
 from typing import Any, Callable, Dict, Optional
-from dcos_migrate.system import Manifest
 import dcos_migrate.utils as utils
 from .backup import Backup
 from .backup_list import BackupList

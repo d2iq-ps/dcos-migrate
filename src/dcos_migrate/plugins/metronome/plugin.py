@@ -1,7 +1,7 @@
 import typing as T
 from dcos_migrate.plugins.plugin import MigratePlugin
 from dcos_migrate.plugins.cluster import ClusterPlugin
-from dcos_migrate.plugins.secret import SecretPlugin  # type: ignore
+from dcos_migrate.plugins.secret import SecretPlugin
 from dcos_migrate.system import DCOSClient, BackupList, Backup, ManifestList
 from .migrator import MetronomeMigrator
 
