@@ -12,18 +12,19 @@ spec:
   jobTemplate:
     spec:
       template:
-        containers:
-        - command:
-          - /bin/sh
-          - -c
-          - awef
-          image: alpine
-          imagePullPolicy: Always
-          name: hello_world
-          resources:
-            limits:
-              cpu: 1
-              memory: 128Mi
-            requests: {}
+        spec:
+          containers:
+          - command:
+            - /bin/sh
+            - -c
+            - awef
+            image: alpine
+            imagePullPolicy: Always
+            name: hello_world
+            resources:
+              limits:
+                cpu: 1
+                memory: 128Mi
+              requests: {}
   schedule: '* * * * *'
   suspend: true

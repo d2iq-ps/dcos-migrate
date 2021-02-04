@@ -115,8 +115,7 @@ class SecretPlugin(MigratePlugin):
             fullPath = "/".join(filter(None, [b["path"], b["key"]]))
             name = utils.dnsify(b["key"])
 
-            metadata.annotations[utils.namespace_path(
-                "secrets/secretpath")] = fullPath
+            metadata.annotations[utils.namespace_path("secret-path")] = fullPath
             metadata.name = name
             sec = V1Secret(metadata=metadata)
             sec.api_version = 'v1'

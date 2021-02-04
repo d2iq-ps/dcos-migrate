@@ -1,10 +1,7 @@
-from dcos_migrate.system import Migrator, Manifest, ManifestList
+from dcos_migrate.system import Migrator, Manifest
 import kubernetes.client.models as K  # type: ignore
-import logging
-import re
 import json
 import os
-from dataclasses import dataclass
 import typing as T
 
 
@@ -91,7 +88,7 @@ class MetronomeMigrator(Migrator):
 
     @property
     def container(self) -> "K.V1Container":
-        return self.jobSpec.template.containers[0]
+        return self.jobSpec.template.spec.containers[0]
 
     def warn(self, path: str, msg: str) -> None:
         self._warnings[path] = msg
@@ -119,7 +116,9 @@ class MetronomeMigrator(Migrator):
                         suspend=True,
                         job_template=K.V1beta1JobTemplateSpec(
                             spec=K.V1JobSpec(
-                                template=K.V1PodSpec(containers=[container1])
+                                template=K.V1PodTemplateSpec(
+                                    spec=K.V1PodSpec(containers=[container1])
+                                )
                             )
                         ),
                     ),
@@ -162,11 +161,13 @@ class MetronomeMigrator(Migrator):
                 ) + ' & FETCH_PID_ARRAY+=("$!")'
             yield "for pid in ${FETCH_PID_ARRAY[@]}; do wait $pid || exit $?; done"
 
-        self.container.volume_mounts = {
-            "name": "fetch-artifacts",
-            "mountPath": self.workingDir,
-        }
-        self.jobSpec.template.init_containers = [
+        self.container.volume_mounts = [
+            {
+                "name": "fetch-artifacts",
+                "mountPath": self.workingDir,
+            }
+        ]
+        self.jobSpec.template.spec.init_containers = [
             {
                 "name": "fetch",
                 "image": "bash:5.0",
@@ -177,7 +178,7 @@ class MetronomeMigrator(Migrator):
                 "workingDir": "/fetch_artifacts",
             }
         ]
-        self.jobSpec.template.volumes = [{"name": "fetch-artifacts", "emptyDir": {}}]
+        self.jobSpec.template.spec.volumes = [{"name": "fetch-artifacts", "emptyDir": {}}]
 
     def handleCmd(self, key: str, value: str, full_path: str) -> None:
         if value and value != "":
@@ -294,12 +295,12 @@ class MetronomeMigrator(Migrator):
         )
 
         self.handleImage("image", value["id"], full_path + ".id")
-        if value.get("forcePull") != None:
+        if value.get("forcePull") is not None:
             self.handleForcePull(
                 "forcePull", value["forcePull"], full_path + ".forcePull"
             )
 
-        if value.get("privileged") != None:
+        if value.get("privileged") is not None:
             self.handlePrivileged(
                 "privileged", value["privileged"], full_path + ".privileged"
             )
