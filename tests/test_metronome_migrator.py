@@ -1,13 +1,9 @@
 from dcos_migrate.plugins.metronome import MetronomeMigrator
 from dcos_migrate.system import ManifestList, Manifest
 from kubernetes.client.models import V1ConfigMap, V1ObjectMeta  # type: ignore
-from kubernetes.client import ApiClient  # type: ignore
 
 from base64 import b64encode
-import datetime
 import json
-import pytest
-import yaml
 
 
 def create_manifest_list_cluster() -> ManifestList:

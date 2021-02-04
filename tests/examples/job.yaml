@@ -13,56 +13,57 @@ spec:
   jobTemplate:
     spec:
       template:
-        containers:
-        - args:
-          - wef
-          command:
-          - /bin/sh
-          - -c
-          - echo "hello world"
-          env:
-          - name: MyVAR
-            valueFrom:
-              secretKeyRef:
-                key: mySecret
-                name: TODO_ref
-          - name: envKey
-            value: envVal
-          image: alpine
-          imagePullPolicy: Always
-          name: hello-world
-          resources:
-            limits:
-              cpu: 1
-              nvidia.com/gpu: 0
-              memory: 128Mi
-            requests:
-              nvidia.com/gpu: 0
-          volumeMounts:
-            name: fetch-artifacts
-            mountPath: /work
-        initContainers:
-        - name: fetch
-          image: bash:5.0
-          command:
-          - bash
-          - -c
-          - 'set -x
+        spec:
+          containers:
+          - args:
+            - wef
+            command:
+            - /bin/sh
+            - -c
+            - echo "hello world"
+            env:
+            - name: MyVAR
+              valueFrom:
+                secretKeyRef:
+                  key: mySecret
+                  name: TODO_ref
+            - name: envKey
+              value: envVal
+            image: alpine
+            imagePullPolicy: Always
+            name: hello-world
+            resources:
+              limits:
+                cpu: 1
+                nvidia.com/gpu: 0
+                memory: 128Mi
+              requests:
+                nvidia.com/gpu: 0
+            volumeMounts:
+            - name: fetch-artifacts
+              mountPath: /work
+          initContainers:
+          - name: fetch
+            image: bash:5.0
+            command:
+            - bash
+            - -c
+            - 'set -x
 
-            set -e
+              set -e
 
-            FETCH_PID_ARRAY=()
+              FETCH_PID_ARRAY=()
 
-            ( wget -O "artifact.com" "http://artifact.com" && chmod a+x "artifact.com"
-            ) & FETCH_PID_ARRAY+=("$!")
+              ( wget -O "artifact.com" "http://artifact.com" && chmod a+x "artifact.com"
+              ) & FETCH_PID_ARRAY+=("$!")
 
-            for pid in ${FETCH_PID_ARRAY[@]}; do wait $pid || exit $?; done'
-          volumeMounts:
+              for pid in ${FETCH_PID_ARRAY[@]}; do wait $pid || exit $?; done'
+            volumeMounts:
+            - name: fetch-artifacts
+              mountPath: /fetch-artifacts
+            workingDir: /fetch_artifacts
+          volumes:
           - name: fetch-artifacts
-            mountPath: /fetch-artifacts
-          workingDir: /fetch_artifacts
-        volumes:
-        - name: fetch-artifacts
-          emptyDir: {}
+            emptyDir: {}
   schedule: '*/5 * * * *'
   suspend: false
