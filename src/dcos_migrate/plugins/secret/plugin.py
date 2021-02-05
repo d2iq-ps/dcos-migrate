@@ -113,16 +113,15 @@ class SecretPlugin(MigratePlugin):
             logging.debug("Found backup {}".format(ba))
             b = ba.data
             fullPath = "/".join(filter(None, [b["path"], b["key"]]))
-            name = utils.dnsify(b["key"])
+            name = b["key"]
 
             metadata.annotations[utils.namespace_path("secret-path")] = fullPath
-            metadata.name = name
+            metadata.name = utils.make_subdomain(name.split('/'))
             sec = V1Secret(metadata=metadata)
             sec.api_version = 'v1'
             sec.kind = 'Secret'
             sec.data = {}
-            sec.data[name] = b64encode(
-                    b['value'].encode('ascii')).decode('ascii')
+            sec.data[utils.dnsify(name)] = b64encode(b['value'].encode('ascii')).decode('ascii')
 
             manifest = Manifest(pluginName=self.plugin_name,
                                 manifestName=utils.dnsify(fullPath))
