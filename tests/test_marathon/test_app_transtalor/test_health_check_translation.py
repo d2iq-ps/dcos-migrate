@@ -37,7 +37,7 @@ def test_command_health_check_with_all_fields_set():
         "timeoutSeconds": 99,
         "periodSeconds": 45,
         "initialDelaySeconds": 123,
-        "command": ["/bin/sh", "-c", "exit 0"]
+        "exec": {"command": ["/bin/sh", "-c", "exit 0"]}
     }
 
 
@@ -57,7 +57,7 @@ def test_second_health_check_dropped_warning():
     result, warnings = app_translator.translate_app(app, EMPTY_SETTINGS)
 
     assert any("dropped health check" in w.lower() for w in warnings)
-    assert result['spec']['template']['spec']['containers'][0]['livenessProbe']['command'] ==\
+    assert result['spec']['template']['spec']['containers'][0]['livenessProbe']['exec']['command'] ==\
         ["/bin/sh", "-c", "exit 0"]
 
 

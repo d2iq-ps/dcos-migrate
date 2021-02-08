@@ -201,7 +201,7 @@ def health_check_to_probe(
 
     if check['protocol'] == 'COMMAND':
         mapping['command.value'] = \
-            lambda command: Translated({'command': ["/bin/sh", "-c", command]})
+            lambda command: Translated({'exec': {'command': ["/bin/sh", "-c", command]}})
     else:
         mapping[('protocol', 'port', 'portIndex', 'path')] = \
             get_network_probe_builder(get_port_by_index)
