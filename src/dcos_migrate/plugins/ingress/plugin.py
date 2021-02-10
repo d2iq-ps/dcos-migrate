@@ -1,4 +1,5 @@
 #
+import logging
 from typing import Any
 
 from dcos_migrate.plugins import plugin
@@ -18,18 +19,24 @@ class EdgeLBPlugin(plugin.MigratePlugin):
         **kwargs: Any
     ) -> system.BackupList:
         service_path = "/service/edgelb"
+        bl = system.BackupList()
 
         if "service_name" in kwargs:
             service_path = "/service/{}/api".format(kwargs["service_name"])
 
         url = "{}{}/v2/pools".format(client.dcos_url, service_path)
 
-        pools = client.get(url).json()
+        try:
+            resp = client.get(url)
+        except:
+            logging.warning("EdgeLB not installed. Skipping")
+            return bl
+
+        pools = resp.json()
 
         if "pool_name" in kwargs:
             pools = [p for p in pools if p["name"] == kwargs["pool_name"]]
 
-        bl = system.BackupList()
         for pool in pools:
             parsed_pool = edgelb.parse_pool(pool)
 
