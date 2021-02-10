@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterator, List, Mapping
 from .app_secrets import AppSecretMapping
 from .common import InvalidAppDefinition, main_container, pod_spec_update, try_oneline_dump
 from .mapping_utils import ListExtension, Translated
+import dcos_migrate.utils as utils
 
 
 def translate_volumes(
@@ -105,7 +106,7 @@ class _SecretVolumeMapper(_VolumeMapper):
 
     @staticmethod
     def secret_volume_name(k8s_secret_name: str) -> str:
-        return 'secrets-' + k8s_secret_name
+        return utils.make_label('secrets-' + k8s_secret_name)
 
     def consume(self, volume: Dict[str, Any]) -> bool:
         fields = volume.copy()
