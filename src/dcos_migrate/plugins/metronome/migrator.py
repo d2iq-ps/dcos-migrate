@@ -249,13 +249,14 @@ class MetronomeMigrator(Migrator):
         self.container.securityContext = K.V1PodSecurityContext(dict(privileged=value))
 
     def handleRestartPolicy(self, key: str, value: str, full_path: str) -> None:
-        if value.title() == "Never":
-            self.jobSpec.restartPolicy = value.title()
-        else:
-            self.warn(
-                full_path,
-                f"restartPolicy '{value}' was dropped. Now the default of 'spec.backoffLimit' will implicitly try 6 times.",
-            )
+        # A CronJob cannot use the implicit default restartPolicy of `Always`,
+        # so we always need to set this.  The valid values for a CronJob are
+        # `OnFailure` and `Never`.  Unless we come up with a good translation
+        # from Metronome's `activeDeadlineSeconds` to K8s `backoffLimit` the
+        # most reasonable value is `Never`.
+        if value.upper() != "NEVER":
+            self.warn(full_path, f"Metronome restart policy '{value}' was dropped.")
+        self.jobSpec.template.spec.restart_policy = 'Never'
 
     def handleRunArgs(self, key: str, value: T.List[str], full_path: str) -> None:
         self.container.args = value
