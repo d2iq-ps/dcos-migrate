@@ -59,3 +59,4 @@ def test_secret_migrate():
         ml = s.migrate(backupList=bl, manifestList=ManifestList())
 
         assert len(ml) == 1
+        assert ml[0][0].data['foo.bar'] == 'Rk9PQkFS'
