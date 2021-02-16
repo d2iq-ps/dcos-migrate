@@ -120,8 +120,9 @@ class SecretPlugin(MigratePlugin):
             sec = V1Secret(metadata=metadata)
             sec.api_version = 'v1'
             sec.kind = 'Secret'
-            sec.data = {}
-            sec.data[utils.dnsify(name)] = b64encode(b['value'].encode('ascii')).decode('ascii')
+            # K8s requires secret values to be base64-encoded.  The secret value
+            # is base64-encoded during backup so it can be passed as-is here.
+            sec.data = {utils.dnsify(name): b['value']}
 
             manifest = Manifest(pluginName=self.plugin_name,
                                 manifestName=utils.dnsify(fullPath))
