@@ -14,7 +14,7 @@ def make_label(name: str) -> str:
     # name.
 
     if not name:
-        name = '0'
+        name = 'x'
     # Recode the name as ASCII, ignoring any non-ascii characters
     name = name.encode().decode('ascii', errors='ignore')
     # Replace any non-alphanumeric values with `-`
@@ -23,7 +23,7 @@ def make_label(name: str) -> str:
     name = name[:63]
     # First and last character cannot be `-`
     if name[0] == '-':
-        name = '0' + name[1:]
+        name = 'x' + name[1:]
     if name[-1] == '-':
         name = name[:-1] + '0'
     return name
