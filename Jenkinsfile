@@ -14,7 +14,7 @@ pipeline {
   stages {
     stage("ci") {
       agent {
-        label "s3"
+        label "mesos"
       }
       steps {
         sh 'bin/ci'
