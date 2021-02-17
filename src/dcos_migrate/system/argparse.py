@@ -7,18 +7,22 @@ class Arg(object):
 
     def __init__(self,
                  name: str,
+                 alternatives: List[str] = [],
                  plugin_name: Optional[str] = None,
                  action: str = 'store',
                  nargs: Union[int, str, None] = None,
                  epilog: str = '',
                  default: Optional[Any] = None,
-                 type: Union[Callable[[str], Any], argparse.FileType] = str,
+                 type: Optional[Union[Callable[[str], Any],
+                                      argparse.FileType]] = None,
                  choices: Optional[Iterable[Any]] = None,
-                 required: bool = False,
+                 required: Optional[bool] = None,
                  help: str = '',
-                 metavar: Optional[str] = None):
+                 metavar: Optional[str] = None,
+                 positional: bool = False):
         super(Arg, self).__init__()
         self._name = name
+        self._alternatives = alternatives
         self._plugin_name = plugin_name
         self._action = action
         self._nargs = nargs
@@ -28,6 +32,7 @@ class Arg(object):
         self._required = required
         self._help = help
         self._metavar = metavar
+        self._positional = positional
 
     @ property
     def plugin_name(self) -> Optional[str]:
@@ -45,18 +50,41 @@ class Arg(object):
     def attr_arg(self) -> str:
         return self.arg.replace("-", "_")
 
-    @ property
+    @property
     def arg_name(self) -> str:
-        return "--{}".format(self.arg)
+        p = "--"
+        if self._positional:
+            p = ""
+        return "{}{}".format(p, self.arg)
+
+    @property
+    def args_list(self) -> List[str]:
+        l = [self.arg_name]
+        l.extend(self._alternatives)
+
+        return l
+
+    @property
+    def clean_kwargs(self) -> Dict[str, Any]:
+        d = {
+            'action': self._action,
+            'nargs': self._nargs,
+            'default': self._default,
+            'type': self._type,
+            'choices': self._choices,
+            'required': self._required,
+            'help': self._help,
+            'metavar': self._metavar
+        }
+
+        for key in list(d):
+            if d[key] is None:
+                del d[key]
+
+        return d
 
     def add_argument(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(self.arg_name, action=self._action,
-                            nargs=self._nargs,  # type: ignore
-                            default=self._default,
-                            type=self._type,
-                            choices=self._choices,  # type: ignore
-                            required=self._required, help=self._help,
-                            metavar=self._metavar)
+        parser.add_argument(*self.args_list, **self.clean_kwargs)
 
     def get_result(self, namespace: argparse.Namespace) -> Any:
         return getattr(namespace, self.attr_arg)
@@ -72,11 +100,11 @@ class BoolArg(Arg):
         noarg = self.arg_name.replace("--", "--no-", 1)
         parser.add_argument(noarg, action='store_false',
                             default=self._default,
-                            required=self._required,
+                            required=self._required,  # type: ignore
                             help=self._help, dest=self.attr_arg)
         parser.add_argument(self.arg_name, action='store_true',
                             default=self._default,
-                            required=self._required,
+                            required=self._required,  # type: ignore
                             help=self._help, dest=self.attr_arg)
 
 
@@ -131,7 +159,11 @@ class ArgParse(object):
             a.add_argument(self._parser)
 
     def parse_args(self, args: Optional[List[str]] = None) -> Dict[str, Any]:
-        parsed_args = self.parser.parse_args(args)
+        parsed_args = None
+        if args:
+            parsed_args = self.parser.parse_args(args)
+        else:
+            parsed_args = self.parser.parse_args()
 
         options: Dict[str, Any] = {}
 
