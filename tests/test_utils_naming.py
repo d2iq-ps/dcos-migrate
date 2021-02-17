@@ -3,7 +3,7 @@ from dcos_migrate.utils import make_label, make_subdomain, dnsify, namespace_pat
 
 
 @pytest.mark.parametrize("path_name, expected_name", [
-    ("", "0"),
+    ("", "x"),
     ("foo", "foo"),
     ("foo/bar", "foo-bar"),
     ("foo!bar/baz", "foo-bar-baz"),
@@ -11,7 +11,7 @@ from dcos_migrate.utils import make_label, make_subdomain, dnsify, namespace_pat
         "storage/tls-6EXBIFNI3ADKCHAKEKFSO7RA6SZO4WAUO5JMXMFN5LS5DXA5N23A-private-key",
         "storage-tls-6EXBIFNI3ADKCHAKEKFSO7RA6SZO4WAUO5JMXMFN5LS5DXA5N23"
     ),
-    ("==", '00'),
+    ("==", 'x0'),
 ])
 def test_make_label(path_name, expected_name):
     assert make_label(path_name) == expected_name
