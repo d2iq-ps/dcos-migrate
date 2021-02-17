@@ -5,6 +5,8 @@ from typing import Any
 from dcos_migrate.plugins import plugin
 from dcos_migrate import system
 
+from dcos.errors import DCOSHTTPException
+
 from . import edgelb
 from . import migrator
 
@@ -28,8 +30,12 @@ class EdgeLBPlugin(plugin.MigratePlugin):
 
         try:
             resp = client.get(url)
-        except:
-            logging.warning("EdgeLB not installed. Skipping")
+        except DCOSHTTPException as e:
+            if e.status() == 404:
+                logging.warning("EdgeLB not installed. Skipping")
+            else:
+                logging.critical(
+                    "Unexpected HTTP error for EdgeLB {}".format(e))
             return bl
 
         pools = resp.json()
