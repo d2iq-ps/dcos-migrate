@@ -1,11 +1,10 @@
-#
 import logging
 from typing import Any
 
 from dcos_migrate.plugins import plugin
 from dcos_migrate import system
 
-from dcos.errors import DCOSHTTPException
+from dcos.errors import DCOSHTTPException  # type: ignore
 
 from . import edgelb
 from . import migrator
