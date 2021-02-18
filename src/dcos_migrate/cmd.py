@@ -70,9 +70,7 @@ class DCOSMigrate(object):
         levels = [logging.CRITICAL, logging.WARNING,
                   logging.INFO, logging.DEBUG]
 
-        v = 0
-        if 'verbose' in self.pm.config['global']:
-            v = self.pm.config['global']['verbose']
+        v = self.pm.config['global'].get('verbose', 0)
         level = levels[min(len(levels)-1, v)]
         logging.basicConfig(level=level, force=True)
 
