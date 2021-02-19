@@ -10,12 +10,14 @@ from dcos_migrate.plugins.plugin_manager import PluginManager
 class DCOSMigrate(object):
     """docstring for DCOSMigrate."""
 
+    phases_choices = ["all", "backup", "backup_data",
+                      "migrate", "migrate_data"]
+
     config_defaults = [
         Arg(
             name="phase",
             nargs="?",
-            choices=["backup", "backup_data",
-                     "migrate", "migrate_data", "all"],
+            choices=phases_choices,
             default="all",
             positional=True,
             help="phase to start with."
@@ -44,29 +46,35 @@ class DCOSMigrate(object):
             usage='Does a backup of your DC/OS cluster and migrates everything into K8s Manifests'
         )
 
-        self._run = ""
+        self.phases = [self.initPhase, self.backup, self.backup_data,
+                       self.migrate, self.migrate_data]
 
-    def _is_not_phase(self, phase: str) -> bool:
-        return (not self._is_phase("all") and not self._is_phase(phase))
-
-    def _is_phase(self, phase: str) -> bool:
-        return bool(self.pm.config['global']['phase'] == phase)
+    @property
+    def selected_phase(self) -> bool:
+        """returns the int(index) of the selected phase or 0"""
+        return self.phases_choices.index(self.pm.config['global'].get('phase', "all"))
 
     def _end_process(self, message: str, exit_code: int = 0) -> None:
-        print("Ending process - {}".format(message))
+        print("Ending DC/OS migration - {}".format(message))
         sys.exit(exit_code)
 
     def run(self, args: Optional[List[str]] = None) -> None:
+        """main entrypoint to start the migration script."""
         self.handleArgparse(args)
         self.handleGlobal()
 
-        self.backup()
-        self.backup_data()
-        self.migrate()
-        self.migrate_data()
+        for i, p in enumerate(self.phases):
+            if self.selected_phase > i:
+                p(skip=True)
+                continue
+            p()
+
+            if self.selected_phase and self.selected_phase == i:
+                self._end_process(
+                    "selected phase {} reached".format(self.phases_choices[i]))
 
     def handleGlobal(self) -> None:
-        # logging
+        """"handle global config before starting the process""""
         levels = [logging.CRITICAL, logging.WARNING,
                   logging.INFO, logging.DEBUG]
 
@@ -79,8 +87,12 @@ class DCOSMigrate(object):
             args = []
         self.pm.config = self.argparse.parse_args(args)
 
-    def backup(self, pluginName: Optional[str] = None) -> None:
-        if self._is_not_phase("backup"):
+    def initPhase(self, skip: bool = False) -> None:
+        """currently unused and empty method to cover all choice"""
+        pass
+
+    def backup(self, pluginName: Optional[str] = None, skip: bool = False) -> None:
+        if skip:
             logging.info("skipping backup - trying to load from disk.")
             self.backup_list.load()
             return
@@ -100,11 +112,8 @@ class DCOSMigrate(object):
 
         self.backup_list.store()
 
-        if self._is_phase("backup"):
-            self._end_process("Backup finished")
-
-    def backup_data(self, pluginName: Optional[str] = None) -> None:
-        if self._is_not_phase("backup_data"):
+    def backup_data(self, pluginName: Optional[str] = None, skip: bool = False) -> None:
+        if skip:
             logging.info("skipping backup data")
             return
         # for batch in self.pm.backup_batch:
@@ -114,11 +123,8 @@ class DCOSMigrate(object):
         #         blist = plugin.backup_data(DCOSClient=self.client)
         #         self.backup_data_list.extend(blist)
 
-        if self._is_phase("backup_data"):
-            self._end_process("Backup data finished")
-
-    def migrate(self, pluginName: Optional[str] = None) -> None:
-        if self._is_not_phase("migrate"):
+    def migrate(self, pluginName: Optional[str] = None, skip: bool = False) -> None:
+        if skip:
             logging.info("skipping migrate - trying to load from disk.")
             self.manifest_list.load()
             return
@@ -134,11 +140,8 @@ class DCOSMigrate(object):
 
         self.manifest_list.store()
 
-        if self._is_phase("migrate"):
-            self._end_process("Migrate finished")
-
-    def migrate_data(self, pluginName: Optional[str] = None) -> None:
-        if self._is_not_phase("migrate_data"):
+    def migrate_data(self, pluginName: Optional[str] = None, skip: bool = False) -> None:
+        if skip:
             logging.info("skipping migrate data")
             return
         # for batch in self.pm.migrate_batch:
@@ -148,8 +151,6 @@ class DCOSMigrate(object):
         #         mlist = plugin.migrate(
         #             backupList=self.backup_list, manifestList=self.manifest_list)
         #         self.manifest_list.extend(mlist)
-        if self._is_phase("migrate_data"):
-            self._end_process("Migrate data finished")
 
     def get_plugin_names(self) -> Iterable[str]:
         return self.pm.plugins.keys()
