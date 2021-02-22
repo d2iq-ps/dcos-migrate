@@ -54,12 +54,12 @@ class DCOSMigrate(object):
         """returns the int(index) of the selected phase or 0"""
         return self.phases_choices.index(self.pm.config['global'].get('phase', "all"))
 
-    def _end_process(self, message: str, exit_code: int = 0) -> None:
+    def _end_process(self, message: str, exit_code: int = 0) -> int:
         print("Ending DC/OS migration - {}".format(message))
-        sys.exit(exit_code)
+        return exit_code
 
-    def run(self, args: Optional[List[str]] = None) -> None:
-        """main entrypoint to start the migration script."""
+    def run(self, args: Optional[List[str]] = None) -> int:
+        """main entrypoint to start the migration script. Returns exit code as int"""
         self.handleArgparse(args)
         self.handleGlobal()
 
@@ -70,8 +70,10 @@ class DCOSMigrate(object):
             p(None, False)
 
             if self.selected_phase and self.selected_phase == i:
-                self._end_process(
+                return self._end_process(
                     "selected phase {} reached".format(self.phases_choices[i]))
+
+        return 0
 
     def handleGlobal(self) -> None:
         """handle global config before starting the process"""
@@ -157,4 +159,4 @@ class DCOSMigrate(object):
 
 
 def run() -> None:
-    DCOSMigrate().run()
+    sys.exit(DCOSMigrate().run())
