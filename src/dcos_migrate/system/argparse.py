@@ -59,10 +59,7 @@ class Arg(object):
 
     @property
     def args_list(self) -> List[str]:
-        l = [self.arg_name]
-        l.extend(self._alternatives)
-
-        return l
+        return [self.arg_name] + self._alternatives
 
     @property
     def clean_kwargs(self) -> Dict[str, Any]:
