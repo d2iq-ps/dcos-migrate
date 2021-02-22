@@ -74,7 +74,7 @@ class DCOSMigrate(object):
                     "selected phase {} reached".format(self.phases_choices[i]))
 
     def handleGlobal(self) -> None:
-        """"handle global config before starting the process""""
+        """handle global config before starting the process"""
         levels = [logging.CRITICAL, logging.WARNING,
                   logging.INFO, logging.DEBUG]
 
