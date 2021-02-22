@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Callable
 
 from dcos_migrate.system import DCOSClient, BackupList, ManifestList, ArgParse, Arg
 from dcos_migrate.plugins.plugin_manager import PluginManager
@@ -46,11 +46,11 @@ class DCOSMigrate(object):
             usage='Does a backup of your DC/OS cluster and migrates everything into K8s Manifests'
         )
 
-        self.phases = [self.initPhase, self.backup, self.backup_data,
-                       self.migrate, self.migrate_data]
+        self.phases: List[Callable[[Optional[str], bool], None]] = [self.initPhase, self.backup, self.backup_data,
+                                                                    self.migrate, self.migrate_data]
 
     @property
-    def selected_phase(self) -> bool:
+    def selected_phase(self) -> int:
         """returns the int(index) of the selected phase or 0"""
         return self.phases_choices.index(self.pm.config['global'].get('phase', "all"))
 
@@ -65,9 +65,9 @@ class DCOSMigrate(object):
 
         for i, p in enumerate(self.phases):
             if self.selected_phase > i:
-                p(skip=True)
+                p(None, True)
                 continue
-            p()
+            p(None, False)
 
             if self.selected_phase and self.selected_phase == i:
                 self._end_process(
@@ -87,7 +87,7 @@ class DCOSMigrate(object):
             args = []
         self.pm.config = self.argparse.parse_args(args)
 
-    def initPhase(self, skip: bool = False) -> None:
+    def initPhase(self, pluginName: Optional[str] = None, skip: bool = False) -> None:
         """currently unused and empty method to cover all choice"""
         pass
 
