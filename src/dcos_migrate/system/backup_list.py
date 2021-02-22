@@ -41,7 +41,7 @@ class BackupList(StorableList):
         return bl
 
     def append_data(self, pluginName: str, backupName: str,  # type: ignore
-                    extension: str, data: str) -> None:
+                    extension: str, data: str, **kwargs) -> None:
         b = Backup(pluginName=pluginName, backupName=backupName,
                    extension=extension)
         b.deserialize(data)
