@@ -11,19 +11,21 @@ import sys
 # This script relies on python-yaml installed via pip, system package manager or some other means.
 import yaml
 
+from dcos_migrate.plugins.marathon.app_secrets import TrackingAppSecretMapping, SecretReference
 from dcos_migrate.plugins.marathon.app_translator import ContainerDefaults, Settings, load, translate_app
 from dcos_migrate.plugins.marathon.service_translator import translate_service
 from dcos_migrate.plugins.marathon import app_secrets
 
 
-class DummyAppSecretMapping(app_secrets.AppSecretMapping):
-    def get_reference(self):
-        raise NotImplementedError()
-
-    def get_image_pull_secret_name(self):
-        raise NotImplementedError()
-
 log = logging.getLogger(__name__) #pylint: disable=invalid-name
+
+
+class FakeAppSecretMapping(app_secrets.AppSecretMapping):
+    def get_reference(self, app_secret_name: str) -> SecretReference:
+        return SecretReference(app_secret_name, app_secret_name)
+
+    def get_image_pull_secret_name(self, app_secret_name: str) -> str:
+        return app_secret_name
 
 
 def translate(path: str, settings: Settings, selected_app_id):
@@ -70,19 +72,20 @@ def main():
         "--default-image", type=str, help="Default image for apps that were running without an image")
 
     translate_cmd.add_argument(
-        "--working-dir",
+        "--container-working-dir",
         type=str,
         help="workingDir of the main container on K8s."
              " Files from Marathon app's `fetch` will be downloaded there by a generated init container."
     )
 
     def translate_func(args):
+        secret_mapping = FakeAppSecretMapping()
         settings = Settings(
             container_defaults=ContainerDefaults(
                 image=args.default_image,
-                working_dir=args.working_dir,
+                working_dir=args.container_working_dir,
             ),
-            app_secret_mapping=DummyAppSecretMapping()
+            app_secret_mapping=secret_mapping
         )
 
         return translate(args.path, settings, args.app_id)
