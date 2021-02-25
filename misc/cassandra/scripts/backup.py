@@ -24,6 +24,8 @@ def _fetch_tasks_envs(app_id: str, task_count: int) -> dict:
                 envs[key] = [value]
             else:
                 envs[key].append(value)
+        _, out, err = run_cmd("{} task exec {} bash -c 'cat $MESOS_SANDBOX/new_user_password'".format(DCOS, task_name))
+        envs["NEW_USER_PASSWORD"] = out
     return envs
 
 
