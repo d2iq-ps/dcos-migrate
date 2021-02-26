@@ -27,9 +27,9 @@ def test_command_health_check_with_all_fields_set():
         }],
     }
 
-    result, warnings = app_translator.translate_app(app, EMPTY_SETTINGS)
+    translated = app_translator.translate_app(app, EMPTY_SETTINGS)
 
-    container = result['spec']['template']['spec']['containers'][0]
+    container = translated.deployment['spec']['template']['spec']['containers'][0]
 
     assert 'livenessProbe' in container
     assert container['livenessProbe'] == {
@@ -54,10 +54,10 @@ def test_second_health_check_dropped_warning():
         ],
     }
 
-    result, warnings = app_translator.translate_app(app, EMPTY_SETTINGS)
+    translated = app_translator.translate_app(app, EMPTY_SETTINGS)
 
-    assert any("dropped health check" in w.lower() for w in warnings)
-    assert result['spec']['template']['spec']['containers'][0]['livenessProbe']['exec']['command'] ==\
+    assert any("dropped health check" in w.lower() for w in translated.warnings)
+    assert translated.deployment['spec']['template']['spec']['containers'][0]['livenessProbe']['exec']['command'] ==\
         ["/bin/sh", "-c", "exit 0"]
 
 
@@ -88,13 +88,14 @@ def test_second_health_check_dropped_warning():
 def test_network_health_check(health_check, expected_action_key, expected_action):
     app = {"id": "/server", "healthChecks": [health_check]}
 
-    result, warnings = app_translator.translate_app(app, EMPTY_SETTINGS)
+    translated = app_translator.translate_app(app, EMPTY_SETTINGS)
 
-    probe = result['spec']['template']['spec']['containers'][0]['livenessProbe']
+    probe = translated.deployment['spec']['template']['spec']['containers'][0]['livenessProbe']
     assert probe[expected_action_key] == expected_action
 
     if not health_check['protocol'].startswith('MESOS'):
-        assert any(["check that the K8s probe is using the correct port" in w for w in warnings])
+        assert any(["check that the K8s probe is using the correct port" in w\
+                    for w in translated.warnings])
 
 
 def test_port_from_port_definitions():
@@ -104,9 +105,9 @@ def test_port_from_port_definitions():
         "portDefinitions":[{"port": 443}, {"port": 123}, {"port": 456}]
     }
 
-    result, warnings = app_translator.translate_app(app, EMPTY_SETTINGS)
+    translated = app_translator.translate_app(app, EMPTY_SETTINGS)
 
-    probe = result['spec']['template']['spec']['containers'][0]['livenessProbe']
+    probe = translated.deployment['spec']['template']['spec']['containers'][0]['livenessProbe']
     assert probe['tcpSocket'] == {'port': 456}
 
 
@@ -119,9 +120,9 @@ def test_port_from_port_mappings():
             {"hostPort": 332, "containerPort": 443}]}
     }
 
-    result, warnings = app_translator.translate_app(app, EMPTY_SETTINGS)
+    translated = app_translator.translate_app(app, EMPTY_SETTINGS)
 
-    probe = result['spec']['template']['spec']['containers'][0]['livenessProbe']
+    probe = translated.deployment['spec']['template']['spec']['containers'][0]['livenessProbe']
     assert probe['tcpSocket'] == {'port': 443}
 
 
@@ -136,6 +137,6 @@ def test_port_zero_in_health_check():
             {"hostPort": 332, "containerPort": 0}]}
     }
 
-    result, warnings = app_translator.translate_app(app, EMPTY_SETTINGS)
+    translated = app_translator.translate_app(app, EMPTY_SETTINGS)
 
-    assert any(['using port 0' in w for w in warnings])
+    assert any(['using port 0' in w for w in translated.warnings])

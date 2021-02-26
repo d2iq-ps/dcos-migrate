@@ -6,7 +6,24 @@ from kubernetes.client import ApiClient  # type: ignore
 from .app_translator import ContainerDefaults, translate_app, Settings
 from .app_secrets import TrackingAppSecretMapping, SecretRemapping
 
-from typing import Any, Optional
+from collections import defaultdict
+from typing import Any, DefaultDict, Mapping, Optional, Set
+
+
+class NodeLabelTracker(object):
+    def __init__(self) -> None:
+        self.labels_by_app: Mapping[str, Set[str]] = defaultdict(set)
+
+    def add_app_node_labels(self, marathon_app_id: str, labels: Set[str]) -> None:
+        self.labels_by_app[marathon_app_id].update(labels)
+
+    def get_apps_by_label(self) -> Mapping[str, Set[str]]:
+        apps_by_label: DefaultDict[str, Set[str]] = defaultdict(set)
+        for app, labels in self.labels_by_app.items():
+            for label in labels:
+                apps_by_label[label].add(app)
+
+        return dict(apps_by_label)
 
 
 @with_comment
@@ -17,8 +34,12 @@ class V1DeploymentWithComment(V1Deployment):  # type: ignore
 class MarathonMigrator(Migrator):
     """docstring for MarathonMigrator."""
 
-    def __init__(self, **kw: Any):
+    def __init__(self, node_label_tracker: Optional[NodeLabelTracker]=None, **kw: Any):
         super(MarathonMigrator, self).__init__(**kw)
+
+        self._node_label_tracker = NodeLabelTracker() if node_label_tracker is None\
+            else node_label_tracker
+
         assert self.object is not None
         self._secret_mapping = TrackingAppSecretMapping(
             self.object['id'], self.object.get('secrets', {}))
@@ -35,14 +56,17 @@ class MarathonMigrator(Migrator):
 
         self.manifest = Manifest(
             pluginName="marathon", manifestName=self.dnsify(value))
+
         assert self.object is not None
-        app, warnings = translate_app(self.object, settings)
+
+        translated = translate_app(self.object, settings)
 
         kc = ApiClient()
-        dapp = kc._ApiClient__deserialize(app, V1DeploymentWithComment)
-        dapp.set_comment(warnings)
+        dapp = kc._ApiClient__deserialize(translated.deployment, V1DeploymentWithComment)
+        dapp.set_comment(translated.warnings)
 
         self.manifest.append(dapp)
+        self._node_label_tracker.add_app_node_labels(self.object['id'], translated.required_node_labels)
 
         for remapping in self._secret_mapping.get_secrets_to_remap():
             secret = _create_remapped_secret(self.manifest_list, remapping, self.object['id'])
