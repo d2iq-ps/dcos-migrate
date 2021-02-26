@@ -1,10 +1,11 @@
 from dcos_migrate.system import Manifest, ManifestList, Migrator, with_comment
 import dcos_migrate.utils as utils
-from kubernetes.client.models import V1Deployment, V1ObjectMeta, V1Secret  # type: ignore
+from kubernetes.client.models import V1Deployment, V1Service, V1ObjectMeta, V1Secret  # type: ignore
 from kubernetes.client import ApiClient  # type: ignore
 
 from .app_translator import ContainerDefaults, translate_app, Settings
 from .app_secrets import TrackingAppSecretMapping, SecretRemapping
+from .service_translator import translate_service
 
 from collections import defaultdict
 from typing import Any, DefaultDict, Mapping, Optional, Set
@@ -24,6 +25,11 @@ class NodeLabelTracker(object):
                 apps_by_label[label].add(app)
 
         return dict(apps_by_label)
+
+
+@with_comment
+class V1ServiceWithComment(V1Service):  # type: ignore
+    pass
 
 
 @with_comment
@@ -67,6 +73,14 @@ class MarathonMigrator(Migrator):
 
         self.manifest.append(dapp)
         self._node_label_tracker.add_app_node_labels(self.object['id'], translated.required_node_labels)
+
+        service, service_warnings = translate_service(dapp.metadata.labels['app'], self.object)
+        if service:
+            kc2 = ApiClient()
+            dservice = kc2._ApiClient__deserialize(service, V1ServiceWithComment)
+            dservice.set_comment(service_warnings)
+            self.manifest.append(dservice)
+
 
         for remapping in self._secret_mapping.get_secrets_to_remap():
             secret = _create_remapped_secret(self.manifest_list, remapping, self.object['id'])

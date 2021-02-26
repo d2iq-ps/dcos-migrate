@@ -418,7 +418,7 @@ def generate_root_mapping(
         'maxLaunchDelaySeconds': skip_if_equals(300),
 
         ('networks', 'portDefinitions', 'requirePorts'):
-            skip_if_equals({}),  # translate_networking,
+            skip_quietly,  # translate_networking,
 
         'residency': skip_if_equals({}),
 

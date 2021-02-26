@@ -46,13 +46,16 @@ def test_simple_with_secret():
 
         mres = m.migrate()
 
-        assert len(m.manifest) == 2
+        assert len(m.manifest) == 3
 
         assert mres is not None
-        # assert m.manifest[0]['metadata']['name'] == 'predictionio-server.group1'
-        assert m.manifest[0].metadata.name == 'group1.predictionio-server'
-        assert m.manifest[1].metadata.name == 'marathonsecret-group1.predictionio-server'
+        app_id = 'group1.predictionio-server'
+        app_label = 'group1-predictionio-server'
+        assert m.manifest[0].metadata.name == app_id
+        assert m.manifest[1].metadata.name == app_label
+        assert m.manifest[2].metadata.name == 'marathonsecret-group1.predictionio-server'
 
+        assert m.manifest[0].metadata.labels['app'] == app_label
         assert m.manifest[0].spec.template.spec.containers[0].env[
             0].value_from.secret_key_ref.name == "marathonsecret-group1.predictionio-server"
         assert m.manifest[0].spec.template.spec.containers[0].env[
@@ -62,8 +65,11 @@ def test_simple_with_secret():
         assert m.manifest[0].spec.template.spec.containers[0].env[
             1].value_from.secret_key_ref.key == "test.secret2"
 
-        assert 'secret1' in m.manifest[1].data
-        assert 'test.secret2' in m.manifest[1].data
+        assert m.manifest[1].kind == 'Service'
+        assert m.manifest[1].spec.selector['app'] == app_label
+
+        assert 'secret1' in m.manifest[2].data
+        assert 'test.secret2' in m.manifest[2].data
 
 
 def test_docker_pull_config_secret():

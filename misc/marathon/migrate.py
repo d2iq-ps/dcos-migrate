@@ -45,9 +45,10 @@ def translate(path: str, settings: Settings, selected_app_id):
             print("---")
 
             result, warnings = translate_service(app)
-            print("# Converted from an app {}".format(app_id))
-            print("\n\n".join([''] + warnings).replace('\n', '\n# '))
-            print(yaml.safe_dump(result))
+            if result:
+                print("# Converted from an app {}".format(app_id))
+                print("\n\n".join([''] + warnings).replace('\n', '\n# '))
+                print(yaml.safe_dump(result))
         else:
             print('# Skipped an app {}: it is installed from a DCOS package "{}"'.format(app_id, dcos_package_name))
 
