@@ -31,6 +31,8 @@ PASSWD_SECRET_YAML_FILE = "cassandra-auth.yaml"
 # KUBERNETES CLI
 KUBECTL = os.getenv("KUBECTL", "kubectl")
 
+SEP = "--------------------------------------------------"
+
 WARNING = """
 WARNING: ALL THE PARAMETERS ARE GENERATED AS PER THE DCOS VERSION OF THE SERVICE, IT MIGHT NOT BE THE BEST FOR K8s.
 SO BEFORE INSTALLING THE SERVICE PLEASE OPEN A TARGET FILE ({}) AND MODIFY VALUES AS PER THE AVAILABILITY ON THE K8s CLUSTER.
@@ -50,14 +52,13 @@ AUTHENTICATION_SECRET_NAME - Only relavent if AUTHENTICATOR is set to PasswordAu
 """
 
 def print_password_secret_instruction(target_dir: str, secret_name: str, namespace: str, username: str, password: str):
-    separator = "--------------------------------------------------"
     secret_yaml_file = os.path.join(target_dir, PASSWD_SECRET_YAML_FILE)
 
     with open(secret_yaml_file, "w+") as f:
         f.write(PASSWD_SECRET_TEMPLATE.format(
             secret_name,
-            base64.b64encode(username),
-            base64.b64encode(password)))
+            base64.b64encode(username.encode("ascii")).decode("ascii"),
+            base64.b64encode(password.encode("ascii")).decode("ascii")))
     
     SECRET_CMD = '''
 {kubectl} apply \\
@@ -65,21 +66,30 @@ def print_password_secret_instruction(target_dir: str, secret_name: str, namespa
     --filename {secret_yaml_file}
 '''
 
-    print(separator)
+    print(SEP)
     print("Run following command to create secret for PasswordAuthenticator: {}".format(
         SECRET_CMD.format(kubectl=KUBECTL, namespace=namespace, secret_yaml_file=secret_yaml_file)))
-    print(separator)
+    print(SEP)
 
 
-def print_instructions(namespace: str, instance: str, target_file: str, version: str):
-    separator = "--------------------------------------------------"
-
+def print_tls_instructions(namespace: str):
     TLS_CMD = '''
 {kubectl} create secret tls {secret_name} \\
     --namespace {namespace} \\
     --cert {cert_file} \\
     --key {key_file}
 '''
+
+    print(SEP)
+    print("Since TLS is enabled, make sure to create a TLS secret that contains the certificate (cassandra.crt) and the private key (cassandra.key).")
+    print("The name of the secret should be `cassandra-tls` and namespace should be `{}`".format(namespace))
+    print("Following command could be used here: {}".format(
+        TLS_CMD.format(kubectl=KUBECTL, secret_name="cassandra-tls",
+          namespace=namespace, cert_file="cassandra.crt", key_file="cassandra.key")))
+    print(SEP)
+
+
+def print_instructions(namespace: str, instance: str, target_file: str, version: str):
     KUDO_CMD = '''
 {kubectl} kudo install \\
     --namespace {namespace} \\
@@ -94,27 +104,18 @@ def print_instructions(namespace: str, instance: str, target_file: str, version:
     --instance {instance}
 """
 
-    print(separator)
-    print("If TLS is enabled, make sure to create a TLS secret that contains the certificate (cassandra.crt) and the private key (cassandra.key).")
-    print("The name of the secret should be `cassandra-tls` and namespace should be `{}`".format(namespace))
-    print("Following command could be used here: {}".format(
-        TLS_CMD.format(kubectl=KUBECTL, secret_name="cassandra-tls",
-          namespace=namespace, cert_file="cassandra.crt", key_file="cassandra.key")))
-    print(separator)
-
+    print(SEP)
+    print(WARNING.format(target_file))
+    print(SEP)
     print("Run the following command to install Cassandra on K8s: {}".format(
         KUDO_CMD.format(kubectl=KUBECTL, namespace=namespace,
           instance=instance, target_file=target_file, version=version)))
-    print(separator)
-
-    print(WARNING.format(target_file))
-    print(separator)
-
+    print(SEP)
     print("Run the following command to check the status: {}".format(
         KUDO_STATUS_CMD.format(kubectl=KUBECTL, namespace=namespace, instance=instance)))
-    print(separator)
+    print(SEP)
     print("Make sure plan shows COMPELTE, before proceeding further.")
-    print(separator)
+    print(SEP)
 
 
 def translate_mesos_to_k8s(namespace: str, target_dir: str, src_file: str, target_file: str) -> bool:
@@ -146,12 +147,13 @@ def translate_mesos_to_k8s(namespace: str, target_dir: str, src_file: str, targe
     src_envs["CASSANDRA_OTC_COALESCING_STRATEGY"] = src_envs["CASSANDRA_OTC_COALESCING_STRATEGY"].lower()
 
     # Check if TLS is enabled, refer TLS secret
-    if src_envs["SECURITY_TRANSPORT_ENCRYPTION_ENABLED"] == "true":
+    if "SECURITY_TRANSPORT_ENCRYPTION_ENABLED" in src_envs and src_envs["SECURITY_TRANSPORT_ENCRYPTION_ENABLED"] == "true":
+        print_tls_instructions(namespace)
         src_envs["CASSANDRA_TLS_SECRET_NAME"] = "cassandra-tls"        
     
     # Check if Authenticator is PasswordAuthenticator
     if src_envs["CASSANDRA_AUTHENTICATOR"] == "PasswordAuthenticator":
-        print_password_secret_instruction(target_dir, "cassandra-auth", namespace, src_env["NEW_SUPERUSER"], src_env["NEW_USER_PASSWORD"])
+        print_password_secret_instruction(target_dir, "cassandra-auth", namespace, src_envs["NEW_SUPERUSER"], src_envs["NEW_USER_PASSWORD"])
         src_envs["CASSANDRA_AUTHENTICATION_SECRET_NAME"] = "cassandra-auth"
 
     # Convert Cassandra Rack-awareness to K8s Cassandra Node Topology
