@@ -72,5 +72,5 @@ class MarathonPlugin(MigratePlugin):
         if app_node_labels:
             logging.info('Node labels used by deployments generated from Marathon apps:\n{}\n'
                          'Please make sure that these labels are properly set on nodes\nof the'
-                         ' target Kubernetes cluster!'.format(json.dumps(app_node_labels)))
+                         ' target Kubernetes cluster!'.format(json.dumps(list(app_node_labels))))
         return ml
