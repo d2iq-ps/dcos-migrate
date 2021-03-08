@@ -27,9 +27,9 @@ def test_host_path_volumes():
         },
     }
 
-    result, warnings = app_translator.translate_app(app, settings)
+    translated = app_translator.translate_app(app, settings)
 
-    template_spec = result['spec']['template']['spec']
+    template_spec = translated.deployment['spec']['template']['spec']
     volumes = sorted(template_spec['volumes'], key = lambda v: v['name'])
     assert volumes == [
         {"name": "volume-0", 'hostPath': {"path": "/volumes/rw"}},
@@ -45,7 +45,7 @@ def test_host_path_volumes():
     # For now, we do not translate volumes with a "hostPath" relative to
     # Mesos sandbox (which typically are a part of a persistent volume setup).
     # Persistent volumes themselves aren't translated either.
-    volume_warnings = [w for w in warnings if "Cannot translate a volume" in w]
+    volume_warnings = [w for w in translated.warnings if "Cannot translate a volume" in w]
     assert len(volume_warnings) == 2
     assert any("relative_to_sandbox" in w for w in volume_warnings)
     assert any("persistent" in w for w in volume_warnings)
@@ -75,8 +75,8 @@ def test_host_path_volume_with_fetch():
         "fetch": [{"uri": "http://foobar.baz/0xdeadbeef"}],
     }
 
-    result, warnings = app_translator.translate_app(app, settings)
-    template_spec = result['spec']['template']['spec']
+    translated = app_translator.translate_app(app, settings)
+    template_spec = translated.deployment['spec']['template']['spec']
     volumes = sorted(template_spec['volumes'], key = lambda v: v['name'])
     assert volumes == [
         {"name": "fetch-artifacts", 'emptyDir': {}},
@@ -113,9 +113,9 @@ def test_secret_volume_with_host_path():
         app_secret_mapping=TrackingAppSecretMapping(app['id'], app['secrets']),
     )
 
-    result, warnings = app_translator.translate_app(app, settings)
+    translated = app_translator.translate_app(app, settings)
 
-    template_spec = result['spec']['template']['spec']
+    template_spec = translated.deployment['spec']['template']['spec']
 
     volumes = sorted(template_spec['volumes'], key = lambda v: v['name'])
     assert volumes == [
@@ -164,9 +164,9 @@ def test_multiple_secret_volumes():
         app_secret_mapping=TrackingAppSecretMapping(app['id'], app['secrets']),
     )
 
-    result, warnings = app_translator.translate_app(app, settings)
+    translated = app_translator.translate_app(app, settings)
 
-    template_spec = result['spec']['template']['spec']
+    template_spec = translated.deployment['spec']['template']['spec']
 
     volumes = sorted(template_spec['volumes'], key = lambda v: v['name'])
     assert volumes == [{

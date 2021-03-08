@@ -38,16 +38,17 @@ def translate(path: str, settings: Settings, selected_app_id):
         dcos_package_name = app.get('labels', {}).get("DCOS_PACKAGE_NAME")
 
         if dcos_package_name is None:
-            result, warnings = translate_app(app, settings)
+            translated = translate_app(app, settings)
             print("# Converted from an app {}".format(app_id))
-            print("\n\n".join([''] + warnings).replace('\n', '\n# '))
-            print(yaml.safe_dump(result))
+            print("\n\n".join([''] + translated.warnings).replace('\n', '\n# '))
+            print(yaml.safe_dump(translated.deployment))
             print("---")
 
             result, warnings = translate_service(app)
-            print("# Converted from an app {}".format(app_id))
-            print("\n\n".join([''] + warnings).replace('\n', '\n# '))
-            print(yaml.safe_dump(result))
+            if result:
+                print("# Converted from an app {}".format(app_id))
+                print("\n\n".join([''] + warnings).replace('\n', '\n# '))
+                print(yaml.safe_dump(result))
         else:
             print('# Skipped an app {}: it is installed from a DCOS package "{}"'.format(app_id, dcos_package_name))
 
