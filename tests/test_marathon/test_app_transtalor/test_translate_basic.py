@@ -79,20 +79,22 @@ def test_resource_requests_and_limits(app_resource_fields, expected_k8s_resource
 
 def test_image_in_app_makes_image_default_unnecessary():
     settings = new_settings()
-    app = {"id":"app", "container": {"docker": {"image": "busybox"}}}
+    app = {"id": "app", "container": {"docker": {"image": "busybox"}}}
     translated = app_translator.translate_app(app, settings)
     assert translated.deployment['spec']['template']['spec']['containers'][0]['image'] == "busybox"
 
 
 def test_image_should_be_present_somewhere():
-    settings = new_settings(image = None)
-    app = {"id":"app", "command": "sleep 300"}
+    settings = new_settings(image=None)
+    app = {"id": "app", "command": "sleep 300"}
     with pytest.raises(app_translator.AdditionalFlagNeeded, match=".*image.*"):
         app_translator.translate_app(app, settings)
 
+
 def test_translates_args():
     settings = new_settings()
-    hello_app = app_translator.load("tests/test_marathon/test_app_transtalor/resources/container-args-app.json")[0]
+    hello_app = app_translator.load(
+        "tests/test_marathon/test_app_transtalor/resources/container-args-app.json")[0]
 
     translated = app_translator.translate_app(hello_app, settings)
 
@@ -130,7 +132,8 @@ def test_env_secret():
 
 def test_unreachable_strategy():
     settings = new_settings()
-    app = {"id":"app", "unreachableStrategy": {"inactiveAfterSeconds": 123, "expungeAfterSeconds": 456}}
+    app = {"id": "app", "unreachableStrategy": {
+        "inactiveAfterSeconds": 123, "expungeAfterSeconds": 456}}
     translated = app_translator.translate_app(app, settings)
     tolerations = translated.deployment['spec']['template']['spec']['tolerations']
 
@@ -143,12 +146,14 @@ def test_unreachable_strategy():
         'tolerationSeconds': 456
     }]
 
-    assert any("inactiveAfterSeconds" in w and "123" in w for w in translated.warnings)
+    assert any(
+        "inactiveAfterSeconds" in w and "123" in w for w in translated.warnings)
 
 
 def test_upgrade_strategy():
     settings = new_settings()
-    app = {"id":"app", "upgradeStrategy": {"minimumHealthCapacity": 0.6250, "maximumOverCapacity": 0.455}}
+    app = {"id": "app", "upgradeStrategy": {
+        "minimumHealthCapacity": 0.6250, "maximumOverCapacity": 0.455}}
     translated = app_translator.translate_app(app, settings)
 
     assert translated.deployment['spec']['strategy'] == {
@@ -159,7 +164,7 @@ def test_upgrade_strategy():
 
 def test_task_kill_grace_period_seconds():
     settings = new_settings()
-    app = {"id":"app", "taskKillGracePeriodSeconds": 123}
+    app = {"id": "app", "taskKillGracePeriodSeconds": 123}
     translated = app_translator.translate_app(app, settings)
     assert translated.deployment['spec']['template']['spec']['terminationGracePeriodSeconds'] == 123
 
@@ -194,13 +199,13 @@ def test_translate_network_ports_env_vars():
     container = translated.deployment['spec']['template']['spec']['containers'][0]
 
     resulting_env = __entries_list_to_dict(container['env'])
-    assert (resulting_env == {'PORTS': '80', 'PORT0': '80', 'PORT_http': '80'})
+    assert (resulting_env == {'PORTS': '80', 'PORT0': '80', 'PORT_HTTP': '80'})
 
 
 def test_constraints():
     settings = new_settings()
     app = {
-        "id":"/foo/barify",
+        "id": "/foo/barify",
         "constraints": [
             ["backpack", "UNIQUE"],
             ["hostname", "MAX_PER", 2],

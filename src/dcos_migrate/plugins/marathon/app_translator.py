@@ -77,8 +77,10 @@ def translate_resources(fields: Dict[str, Any]) -> Translated:
                 if limit_from_requests != 0:
                     yield RESOURCE_TRANSLATION[key](limit_from_requests)
 
-    resources = {'requests': dict(iter_requests()), 'limits': dict(iter_limits())}
-    update = main_container({'resources': {k: v for k, v in resources.items() if v}})
+    resources = {'requests': dict(iter_requests()),
+                 'limits': dict(iter_limits())}
+    update = main_container(
+        {'resources': {k: v for k, v in resources.items() if v}})
     return Translated(update)
 
 
@@ -118,14 +120,17 @@ def translate_env(
         for app_port in network_ports:
             port = effective_port(app_port)
 
-            translated.append({"name": "PORT" + str(app_port.idx), "value": str(port)})
+            translated.append(
+                {"name": "PORT" + str(app_port.idx), "value": str(port)})
             if app_port.name:
-                translated.append({"name": "PORT_" + app_port.name, "value": str(port)})
+                translated.append(
+                    {"name": "PORT_" + app_port.name.upper(), "value": str(port)})
 
     return Translated(
         update=main_container({'env': translated}),
         warnings=[
-            "could not translate the following variables:\n" + json.dumps(not_translated)
+            "could not translate the following variables:\n"
+            + json.dumps(not_translated)
         ] if not_translated else [],
     )
 
@@ -162,10 +167,12 @@ def get_network_probe_builder(
         path = fields.pop('path', '/')
 
         warnings = [] if not fields else \
-            ['Non-translatable health check fields: {}'.format(try_oneline_dump(fields))]
+            ['Non-translatable health check fields: {}'.format(
+                try_oneline_dump(fields))]
 
         use_host_port = protocol in ['TCP', 'HTTP', 'HTTPS']
-        port = get_port_by_index(index, use_host_port) if port is None else port
+        port = get_port_by_index(
+            index, use_host_port) if port is None else port
 
         # TODO (asekretenko): The app translator should choose a value for each port==0
         # once, and ensure that the same value is used for the same port
@@ -179,10 +186,12 @@ def get_network_probe_builder(
             return Translated({'tcpSocket': {'port': port}}, warnings)
 
         if protocol in ['MESOS_HTTP', 'HTTP', 'MESOS_HTTPS', 'HTTPS']:
-            scheme = 'HTTPS' if protocol in ['MESOS_HTTPS', 'HTTPS'] else 'HTTP'
+            scheme = 'HTTPS' if protocol in [
+                'MESOS_HTTPS', 'HTTPS'] else 'HTTP'
             return Translated({'httpGet': {'port': port, 'scheme': scheme, 'path': path}}, warnings)
 
-        raise InvalidAppDefinition("Invalid `protocol` in a health check: {}".format(protocol))
+        raise InvalidAppDefinition(
+            "Invalid `protocol` in a health check: {}".format(protocol))
 
     return build_network_probe
 
@@ -209,7 +218,8 @@ def health_check_to_probe(
 
     if check['protocol'] == 'COMMAND':
         mapping['command.value'] = \
-            lambda command: Translated({'exec': {'command': ["/bin/sh", "-c", command]}})
+            lambda command: Translated(
+                {'exec': {'command': ["/bin/sh", "-c", command]}})
     else:
         mapping[('protocol', 'port', 'portIndex', 'path')] = \
             get_network_probe_builder(get_port_by_index)
@@ -221,9 +231,9 @@ def health_check_to_probe(
 
     if check['protocol'] in ['TCP', 'HTTP', 'HTTPS']:
         warnings.append(
-            "The app is using a deprecated Marathon-level health check:\n" +
-            try_oneline_dump(check) +
-            "\nPlease check that the K8s probe is using the correct port.")
+            "The app is using a deprecated Marathon-level health check:\n"
+            + try_oneline_dump(check)
+            + "\nPlease check that the K8s probe is using the correct port.")
 
     return probe, warnings
 
@@ -299,7 +309,8 @@ def skip_if_equals(default: Any) -> Callable[[Any], Translated]:
 def translate_unreachable_strategy(strategy: Union[Dict[str, Any], str]) -> Translated:
     if isinstance(strategy, str):
         if strategy != "disabled":
-            raise InvalidAppDefinition('Invalid "unreachableStatregy": {}'.format(strategy))
+            raise InvalidAppDefinition(
+                'Invalid "unreachableStatregy": {}'.format(strategy))
 
         return Translated(
             update=pod_spec_update({"tolerations": ListExtension([{
@@ -315,7 +326,8 @@ def translate_unreachable_strategy(strategy: Union[Dict[str, Any], str]) -> Tran
         inactive_after_seconds = fields.pop("inactiveAfterSeconds")
         expunge_after_seconds = fields.pop("expungeAfterSeconds")
     except KeyError as key:
-        raise InvalidAppDefinition('"unreachableStatregy" missing {}'.format(key))
+        raise InvalidAppDefinition(
+            '"unreachableStatregy" missing {}'.format(key))
 
     if fields:
         return Translated(warnings=["Unknown fields: {}".format(try_oneline_dump(fields))])
@@ -329,7 +341,8 @@ def translate_unreachable_strategy(strategy: Union[Dict[str, Any], str]) -> Tran
         }])}),
         warnings=[] if expunge_after_seconds == inactive_after_seconds else [
             'A value of "inactiveAfterSeconds" ({}) different from that of "expungeAfterSeconds"'
-            ' ({}) has been ignored'.format(inactive_after_seconds, expunge_after_seconds)
+            ' ({}) has been ignored'.format(
+                inactive_after_seconds, expunge_after_seconds)
         ],
     )
 
@@ -357,8 +370,8 @@ def translate_upgrade_strategy(strategy: Dict[str, Any]) -> Translated:
 
 
 def get_constraint_translator(
-    register_node_labels: Callable[[Set[str],], None]
-) -> Callable[[Mapping[str, Any],], Translated]:
+    register_node_labels: Callable[[Set[str], ], None]
+) -> Callable[[Mapping[str, Any], ], Translated]:
 
     def translate(fields: Mapping[str, Any]) -> Translated:
         result, labels = translate_constraints(
@@ -376,7 +389,7 @@ def generate_root_mapping(
     app_secrets_mapping: AppSecretMapping,
     error_location: str,
     network_ports: Sequence[AppPort],
-    register_node_labels: Callable[[Set[str],], None],
+    register_node_labels: Callable[[Set[str], ], None],
 ) -> Dict[MappingKey, Any]:
 
     return {
@@ -388,7 +401,8 @@ def generate_root_mapping(
         ('constraints', 'id'): get_constraint_translator(register_node_labels),
 
         ('container',):
-            get_container_translator(container_defaults, app_secrets_mapping, error_location),
+            get_container_translator(
+                container_defaults, app_secrets_mapping, error_location),
 
         ('cpus', 'mem', 'disk', 'gpus', 'resourceLimits'): translate_resources,
 
@@ -426,7 +440,8 @@ def generate_root_mapping(
         'secrets': skip_quietly,
 
         'taskKillGracePeriodSeconds':
-            lambda t: Translated(pod_spec_update({'terminationGracePeriodSeconds': t})),
+            lambda t: Translated(pod_spec_update(
+                {'terminationGracePeriodSeconds': t})),
 
         'tasksHealthy': skip_quietly,
         'tasksRunning': skip_quietly,
@@ -444,13 +459,15 @@ def generate_root_mapping(
 
 
 EXTRACT_COMMAND = dict(
-    [('.zip', 'gunzip')] +
-    [(ext, 'tar -xf') for ext in ['.tgz', '.tar.gz', '.tbz2', '.tar.bz2', '.txz', '.tar.xz']]
+    [('.zip', 'gunzip')]
+    + [(ext, 'tar -xf')
+        for ext in ['.tgz', '.tar.gz', '.tbz2', '.tar.bz2', '.txz', '.tar.xz']]
 )
 
 
 def generate_fetch_command(uri: str, allow_extract: bool, executable: bool) -> str:
-    _, _, filename = uri.rpartition('/')  # NOTE: The path separator is always '/', even on Windows.
+    # NOTE: The path separator is always '/', even on Windows.
+    _, _, filename = uri.rpartition('/')
     _, ext = os.path.splitext(filename)
 
     postprocess = 'chmod a+x' if executable else \
@@ -471,7 +488,8 @@ def translate_fetch(
             ' `--container-working-dir` and run again'.format(error_location)
         )
 
-    warnings = ['This app uses "fetch"; consider using a container image instead.']
+    warnings = [
+        'This app uses "fetch"; consider using a container image instead.']
 
     def iter_command() -> Iterator[str]:
         yield 'set -x'
@@ -485,14 +503,16 @@ def translate_fetch(
             extract = fetch.pop('extract', True)
             executable = fetch.pop('executable', False)
             if fetch:
-                warnings.append('Unknown fields in "fetch": {}'.format(json.dumps(fetch)))
+                warnings.append(
+                    'Unknown fields in "fetch": {}'.format(json.dumps(fetch)))
 
             if cache:
                 warnings.append(
                     '`cache=true` requested for fetching "{}" has been ignored'.format(uri))
 
             if uri.startswith('file://'):
-                warnings.append('Fetching a local file {} is not portable'.format(uri))
+                warnings.append(
+                    'Fetching a local file {} is not portable'.format(uri))
 
             yield generate_fetch_command(uri, extract, executable) + ' & FETCH_PID_ARRAY+=("$!")'
 
@@ -624,7 +644,9 @@ def translate_app(app: Dict[str, Any], settings: Settings) -> TranslatedApp:
     network_ports = get_ports_from_app(app)
 
     node_labels = set()
-    register_node_labels=lambda labels: node_labels.update(labels)
+
+    def register_node_labels(
+        labels: Set[str]) -> None: return node_labels.update(labels)
 
     mapping = generate_root_mapping(
         settings.container_defaults,
