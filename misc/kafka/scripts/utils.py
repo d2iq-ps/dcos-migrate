@@ -5,6 +5,19 @@ import sys
 # Constants
 encoding = "utf-8"
 
+class colors:
+    """Beautify strings in terminal"""
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 def run_cmd(cmd: str, print_output: bool = False, check: bool = True, timeout_seconds: int = 300, print_cmd: bool = False) -> [int, str, str]:
     log.debug('Running command "{}"'.format(cmd, check))
     if print_cmd:
