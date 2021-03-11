@@ -7,6 +7,7 @@
 import argparse
 import logging
 import sys
+import dcos_migrate.utils as utils
 
 # This script relies on python-yaml installed via pip, system package manager or some other means.
 import yaml
@@ -34,7 +35,10 @@ def translate(path: str, settings: Settings, selected_app_id):
         app_id = app.get('id', "(NO ID)")
         if selected_app_id and selected_app_id != app_id:
             continue
-
+        #app_label = app_id.replace('/', '-')
+        #app_label = app_label[1:]
+        app_label = app_id.strip('/')
+        app_label  = utils.make_label(app_label)
         dcos_package_name = app.get('labels', {}).get("DCOS_PACKAGE_NAME")
 
         if dcos_package_name is None:
@@ -44,7 +48,7 @@ def translate(path: str, settings: Settings, selected_app_id):
             print(yaml.safe_dump(translated.deployment))
             print("---")
 
-            result, warnings = translate_service(app)
+            result, warnings = translate_service(app_label,app)
             if result:
                 print("# Converted from an app {}".format(app_id))
                 print("\n\n".join([''] + warnings).replace('\n', '\n# '))
