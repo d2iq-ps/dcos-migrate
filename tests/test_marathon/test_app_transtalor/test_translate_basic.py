@@ -262,7 +262,7 @@ def test_translate_network_ports_env_vars():
     container = translated.deployment['spec']['template']['spec']['containers'][0]
 
     resulting_env = __entries_list_to_dict(container['env'])
-    assert (resulting_env == {'PORTS': '80', 'PORT0': '80', 'PORT_HTTP': '80'})
+    assert (resulting_env == {'HOST': '0.0.0.0', 'PORTS': '80', 'PORT0': '80', 'PORT_HTTP': '80'})
 
 
 def test_constraints():

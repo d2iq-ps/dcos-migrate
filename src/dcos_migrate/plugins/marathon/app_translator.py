@@ -106,6 +106,12 @@ def translate_env(env: Mapping[str, Union[Dict[str, str], str]], app_secret_mapp
     if len(network_ports) > 0:
         all_ports = [str(effective_port(p)) for p in network_ports]
 
+        # in case we're using PORTS we should append HOST=0.0.0.0
+        # DC/OS fills it with the node IP address but for K8s this doesn't
+        # make sense. So we fill it with 0.0.0.0 in case this var is used
+        # for a bind
+        translated.append({"name": "HOST", "value": "0.0.0.0"})
+
         translated.append({"name": "PORTS", "value": ",".join(all_ports)})
         for app_port in network_ports:
             port = effective_port(app_port)
