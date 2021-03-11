@@ -4,38 +4,23 @@ import json
 import os
 import typing as T
 
-
-EXTRACT_COMMAND = dict(
-    [(".zip", "unzip")]
-    + [
-        (ext, "tar -xf")
-        for ext in [".tgz", ".tar.gz", ".tbz2", ".tar.bz2", ".txz", ".tar.xz"]
-    ]
-)
+EXTRACT_COMMAND = dict([(".zip", "unzip")] + [(ext, "tar -xf")
+                                              for ext in [".tgz", ".tar.gz", ".tbz2", ".tar.bz2", ".txz", ".tar.xz"]])
 
 
 def generate_fetch_command(uri: str, allow_extract: bool, executable: bool) -> str:
     # NOTE: The path separator is always '/', even on Windows.
     _, _, filename = uri.rpartition("/")
     _, ext = os.path.splitext(filename)
-    postprocess = (
-        "chmod a+x"
-        if executable
-        else (EXTRACT_COMMAND.get(ext, "") if allow_extract else "")
-    )
+    postprocess = ("chmod a+x" if executable else (EXTRACT_COMMAND.get(ext, "") if allow_extract else ""))
 
-    fmt = (
-        '( wget -O "{fn}" "{uri}" && {postprocess} "{fn}" )'
-        if postprocess
-        else '( wget -O "{fn}" "{uri}")'
-    )
+    fmt = ('( wget -O "{fn}" "{uri}" && {postprocess} "{fn}" )' if postprocess else '( wget -O "{fn}" "{uri}")')
 
     return fmt.format(fn=filename, uri=uri, postprocess=postprocess)
 
 
 class MetronomeMigrator(Migrator):
     """docstring for SecretsMigrator."""
-
     def __init__(
         self,
         defaultImage: str = "alpine:latest",
@@ -103,7 +88,8 @@ class MetronomeMigrator(Migrator):
 
         # intentionally written this way so one can easily scan down paths
         container1 = K.V1Container(
-            name=name, resources=K.V1ResourceRequirements(limits={}, requests={}),
+            name=name,
+            resources=K.V1ResourceRequirements(limits={}, requests={}),
         )
         self.manifest = Manifest(
             data=[
@@ -114,13 +100,8 @@ class MetronomeMigrator(Migrator):
                     spec=K.V1beta1CronJobSpec(
                         schedule="* * * * *",
                         suspend=True,
-                        job_template=K.V1beta1JobTemplateSpec(
-                            spec=K.V1JobSpec(
-                                template=K.V1PodTemplateSpec(
-                                    spec=K.V1PodSpec(containers=[container1])
-                                )
-                            )
-                        ),
+                        job_template=K.V1beta1JobTemplateSpec(spec=K.V1JobSpec(template=K.V1PodTemplateSpec(
+                            spec=K.V1PodSpec(containers=[container1])))),
                     ),
                 )
             ],
@@ -146,9 +127,7 @@ class MetronomeMigrator(Migrator):
                 extract = fetch.pop("extract", True)
                 executable = fetch.pop("executable", False)
                 if fetch:
-                    self.warn(
-                        full_path, f'Unknown fields in "fetch": {json.dumps(fetch)}'
-                    )
+                    self.warn(full_path, f'Unknown fields in "fetch": {json.dumps(fetch)}')
                 if cache:
                     self.warn(
                         full_path,
@@ -156,28 +135,26 @@ class MetronomeMigrator(Migrator):
                     )
                 if uri.startswith("file://"):
                     self.warn(full_path, f"Fetching a local file {uri} is not portable")
-                yield generate_fetch_command(
-                    uri, extract, executable
-                ) + ' & FETCH_PID_ARRAY+=("$!")'
+                yield generate_fetch_command(uri, extract, executable) + ' & FETCH_PID_ARRAY+=("$!")'
             yield "for pid in ${FETCH_PID_ARRAY[@]}; do wait $pid || exit $?; done"
 
-        self.container.volume_mounts = [
-            {
+        self.container.volume_mounts = [{
+            "name": "fetch-artifacts",
+            "mountPath": self.workingDir,
+        }]
+        self.jobSpec.template.spec.init_containers = [{
+            "name":
+            "fetch",
+            "image":
+            "bash:5.0",
+            "command": ["bash", "-c", "\n".join(iter_command())],
+            "volumeMounts": [{
                 "name": "fetch-artifacts",
-                "mountPath": self.workingDir,
-            }
-        ]
-        self.jobSpec.template.spec.init_containers = [
-            {
-                "name": "fetch",
-                "image": "bash:5.0",
-                "command": ["bash", "-c", "\n".join(iter_command())],
-                "volumeMounts": [
-                    {"name": "fetch-artifacts", "mountPath": "/fetch-artifacts"}
-                ],
-                "workingDir": "/fetch_artifacts",
-            }
-        ]
+                "mountPath": "/fetch-artifacts"
+            }],
+            "workingDir":
+            "/fetch_artifacts",
+        }]
         self.jobSpec.template.spec.volumes = [{"name": "fetch-artifacts", "emptyDir": {}}]
 
     def handleCmd(self, key: str, value: str, full_path: str) -> None:
@@ -192,9 +169,7 @@ class MetronomeMigrator(Migrator):
         for k, v in value.items():
             if "secret" in v:
                 assert self.object
-                keyRef = self.dnsify(
-                    self.object.get("secrets", {}).get(v["secret"], {}).get("source")
-                )
+                keyRef = self.dnsify(self.object.get("secrets", {}).get(v["secret"], {}).get("source"))
                 # TODO: find ref from secrets metadata
                 key_selector = K.V1SecretKeySelector(key=keyRef, name="TODO_ref")
                 env_var_src = K.V1EnvVarSource(secret_key_ref=key_selector)
@@ -237,12 +212,11 @@ class MetronomeMigrator(Migrator):
         if value != []:
             self.warn(full_path, "conversion of .run.networks is not yet implemented.")
 
-    def handlePlacementConstraints(
-        self, key: str, value: T.Any, full_path: str
-    ) -> None:
+    def handlePlacementConstraints(self, key: str, value: T.Any, full_path: str) -> None:
         if value != []:
             self.warn(
-                full_path, "conversion of .run.placement.constraints not implemented.",
+                full_path,
+                "conversion of .run.placement.constraints not implemented.",
             )
 
     def handlePrivileged(self, key: str, value: bool, full_path: str) -> None:
@@ -297,14 +271,10 @@ class MetronomeMigrator(Migrator):
 
         self.handleImage("image", value["id"], full_path + ".id")
         if value.get("forcePull") is not None:
-            self.handleForcePull(
-                "forcePull", value["forcePull"], full_path + ".forcePull"
-            )
+            self.handleForcePull("forcePull", value["forcePull"], full_path + ".forcePull")
 
         if value.get("privileged") is not None:
-            self.handlePrivileged(
-                "privileged", value["privileged"], full_path + ".privileged"
-            )
+            self.handlePrivileged("privileged", value["privileged"], full_path + ".privileged")
 
     def handleUser(self, key: str, value: str, full_path: str) -> None:
         self.warn(

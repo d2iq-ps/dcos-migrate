@@ -4,7 +4,6 @@ from dcos_migrate.plugins.marathon import app_translator
 
 from .common import DummyAppSecretMapping
 
-
 EMPTY_SETTINGS = app_translator.Settings(
     app_translator.ContainerDefaults(
         image="busybox",
@@ -16,10 +15,13 @@ EMPTY_SETTINGS = app_translator.Settings(
 
 def test_command_health_check_with_all_fields_set():
     app = {
-        "id": "/healthy",
+        "id":
+        "/healthy",
         "healthChecks": [{
             "protocol": "COMMAND",
-            "command": { "value": "exit 0" },
+            "command": {
+                "value": "exit 0"
+            },
             "gracePeriodSeconds": 123,
             "intervalSeconds": 45,
             "timeoutSeconds": 99,
@@ -37,7 +39,9 @@ def test_command_health_check_with_all_fields_set():
         "timeoutSeconds": 99,
         "periodSeconds": 45,
         "initialDelaySeconds": 123,
-        "exec": {"command": ["/bin/sh", "-c", "exit 0"]}
+        "exec": {
+            "command": ["/bin/sh", "-c", "exit 0"]
+        }
     }
 
 
@@ -47,10 +51,21 @@ def test_second_health_check_dropped_warning():
     and a warning is emitted for all the other health checks.
     """
     app = {
-        "id": "/twice-healthy",
+        "id":
+        "/twice-healthy",
         "healthChecks": [
-            {"protocol": "COMMAND", "command": { "value": "exit 0" }},
-            {"protocol": "COMMAND", "command": { "value": "sleep 1" }},
+            {
+                "protocol": "COMMAND",
+                "command": {
+                    "value": "exit 0"
+                }
+            },
+            {
+                "protocol": "COMMAND",
+                "command": {
+                    "value": "sleep 1"
+                }
+            },
         ],
     }
 
@@ -63,27 +78,69 @@ def test_second_health_check_dropped_warning():
 
 @pytest.mark.parametrize("health_check,expected_action_key,expected_action", [
     (
-        {"protocol": "HTTPS", "port": 10445, "path": "/status"},
+        {
+            "protocol": "HTTPS",
+            "port": 10445,
+            "path": "/status"
+        },
         "httpGet",
-        {"path": "/status", "port": 10445, "scheme": "HTTPS"},
+        {
+            "path": "/status",
+            "port": 10445,
+            "scheme": "HTTPS"
+        },
     ),
     (
-        {"protocol": "MESOS_HTTPS", "port": 9443, "path": "/status"},
+        {
+            "protocol": "MESOS_HTTPS",
+            "port": 9443,
+            "path": "/status"
+        },
         "httpGet",
-        {"path": "/status", "port": 9443, "scheme": "HTTPS"},
+        {
+            "path": "/status",
+            "port": 9443,
+            "scheme": "HTTPS"
+        },
     ),
     (
-        {"protocol": "HTTP", "port": 85, "path": "/healthz"},
+        {
+            "protocol": "HTTP",
+            "port": 85,
+            "path": "/healthz"
+        },
         "httpGet",
-        {"path": "/healthz", "port": 85, "scheme": "HTTP"},
+        {
+            "path": "/healthz",
+            "port": 85,
+            "scheme": "HTTP"
+        },
     ),
     (
-        {"protocol": "MESOS_HTTP", "port": 60080, "path": "/healthz"},
+        {
+            "protocol": "MESOS_HTTP",
+            "port": 60080,
+            "path": "/healthz"
+        },
         "httpGet",
-        {"path": "/healthz", "port": 60080, "scheme": "HTTP"},
+        {
+            "path": "/healthz",
+            "port": 60080,
+            "scheme": "HTTP"
+        },
     ),
-    ({"protocol": "TCP", "port": 123}, "tcpSocket", {"port": 123}),
-    ({"protocol": "MESOS_TCP", "port": 456}, "tcpSocket", {"port": 456}),
+    ({
+        "protocol": "TCP",
+        "port": 123
+    }, "tcpSocket", {
+        "port": 123
+    }),
+    ({
+        "protocol": "MESOS_TCP",
+        "port": 456
+    }, "tcpSocket", {
+        "port": 456
+    }),
 ])
 def test_network_health_check(health_check, expected_action_key, expected_action):
     app = {"id": "/server", "healthChecks": [health_check]}
@@ -101,8 +158,17 @@ def test_network_health_check(health_check, expected_action_key, expected_action
 def test_port_from_port_definitions():
     app = {
         "id": "/server",
-        "healthChecks": [{"protocol": "MESOS_TCP", "portIndex": 2}],
-        "portDefinitions":[{"port": 443}, {"port": 123}, {"port": 456}]
+        "healthChecks": [{
+            "protocol": "MESOS_TCP",
+            "portIndex": 2
+        }],
+        "portDefinitions": [{
+            "port": 443
+        }, {
+            "port": 123
+        }, {
+            "port": 456
+        }]
     }
 
     translated = app_translator.translate_app(app, EMPTY_SETTINGS)
@@ -114,10 +180,19 @@ def test_port_from_port_definitions():
 def test_port_from_port_mappings():
     app = {
         "id": "/server",
-        "healthChecks": [{"protocol": "MESOS_TCP", "portIndex": 1}],
-        "container": {"portMappings":[
-            {"hostPort": 119, "containerPort": 80},
-            {"hostPort": 332, "containerPort": 443}]}
+        "healthChecks": [{
+            "protocol": "MESOS_TCP",
+            "portIndex": 1
+        }],
+        "container": {
+            "portMappings": [{
+                "hostPort": 119,
+                "containerPort": 80
+            }, {
+                "hostPort": 332,
+                "containerPort": 443
+            }]
+        }
     }
 
     translated = app_translator.translate_app(app, EMPTY_SETTINGS)
@@ -131,10 +206,19 @@ def test_port_zero_in_health_check():
     # a uniform support for port 0 throughout the app translation.
     app = {
         "id": "/server",
-        "healthChecks": [{"protocol": "MESOS_TCP", "portIndex": 1}],
-        "container": {"portMappings":[
-            {"hostPort": 119, "containerPort": 80},
-            {"hostPort": 332, "containerPort": 0}]}
+        "healthChecks": [{
+            "protocol": "MESOS_TCP",
+            "portIndex": 1
+        }],
+        "container": {
+            "portMappings": [{
+                "hostPort": 119,
+                "containerPort": 80
+            }, {
+                "hostPort": 332,
+                "containerPort": 0
+            }]
+        }
     }
 
     translated = app_translator.translate_app(app, EMPTY_SETTINGS)

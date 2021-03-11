@@ -4,15 +4,11 @@ from typing import Any, Dict
 
 class Backup(object):
     """docstring for Backup."""
-
-    def __init__(
-        self, pluginName: str, backupName: str, data: Dict[str, Any] = {}, extension: str = 'json'
-    ):
+    def __init__(self, pluginName: str, backupName: str, data: Dict[str, Any] = {}, extension: str = 'json'):
         super(Backup, self).__init__()
         self._plugin_name = pluginName
         if "/" in backupName:
-            raise AttributeError(
-                "backupName {} contains not allowed '/'".format(backupName))
+            raise AttributeError("backupName {} contains not allowed '/'".format(backupName))
         self._name = backupName
         self._data = data
         self._extension = extension

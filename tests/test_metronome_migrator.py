@@ -19,11 +19,7 @@ def create_manifest_list_cluster() -> ManifestList:
     # models do not set defaults -.-
     cfgmap.kind = "ConfigMap"
     cfgmap.api_version = "v1"
-    cfgmap.data = {
-        "MESOS_MASTER_STATE_SUMMARY_BASE64": b64encode(
-            json.dumps({"foo": "bar"}).encode("ascii")
-        )
-    }
+    cfgmap.data = {"MESOS_MASTER_STATE_SUMMARY_BASE64": b64encode(json.dumps({"foo": "bar"}).encode("ascii"))}
 
     manifest = Manifest(pluginName="cluster", manifestName="dcos-cluster")
     manifest.append(cfgmap)

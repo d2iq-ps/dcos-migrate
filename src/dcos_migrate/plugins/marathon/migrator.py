@@ -40,16 +40,14 @@ class V1DeploymentWithComment(V1Deployment):  # type: ignore
 
 class MarathonMigrator(Migrator):
     """docstring for MarathonMigrator."""
-
-    def __init__(self, node_label_tracker: Optional[NodeLabelTracker]=None, **kw: Any):
+    def __init__(self, node_label_tracker: Optional[NodeLabelTracker] = None, **kw: Any):
         super(MarathonMigrator, self).__init__(**kw)
 
         self._node_label_tracker = NodeLabelTracker() if node_label_tracker is None\
             else node_label_tracker
 
         assert self.object is not None
-        self._secret_mapping = TrackingAppSecretMapping(
-            self.object['id'], self.object.get('secrets', {}))
+        self._secret_mapping = TrackingAppSecretMapping(self.object['id'], self.object.get('secrets', {}))
 
         self.translate = {
             "id": self.translate_marathon,
@@ -62,8 +60,7 @@ class MarathonMigrator(Migrator):
         labels = self.object.get('labels', {})
         dcos_package_framework_name = labels.get("DCOS_PACKAGE_FRAMEWORK_NAME")
         if dcos_package_framework_name:
-            logging.warning('Not translating app %s: it runs Mesos framework %s',
-                            value, dcos_package_framework_name)
+            logging.warning('Not translating app %s: it runs Mesos framework %s', value, dcos_package_framework_name)
             return
 
         settings = Settings(
@@ -71,8 +68,7 @@ class MarathonMigrator(Migrator):
             app_secret_mapping=self._secret_mapping,
         )
 
-        self.manifest = Manifest(
-            pluginName="marathon", manifestName=self.dnsify(value))
+        self.manifest = Manifest(pluginName="marathon", manifestName=self.dnsify(value))
 
         assert self.object is not None
 
@@ -91,7 +87,6 @@ class MarathonMigrator(Migrator):
             dservice = kc2._ApiClient__deserialize(service, V1ServiceWithComment)
             dservice.set_comment(service_warnings)
             self.manifest.append(dservice)
-
 
         for remapping in self._secret_mapping.get_secrets_to_remap():
             secret = _create_remapped_secret(self.manifest_list, remapping, self.object['id'])

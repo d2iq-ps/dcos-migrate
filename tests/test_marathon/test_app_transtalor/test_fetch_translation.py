@@ -3,6 +3,7 @@ import pytest
 from dcos_migrate.plugins.marathon import app_translator
 from .common import DummyAppSecretMapping
 
+
 def test_generated_fetch_layout():
     """
     Tests generation of volume and init container for `fetch`.

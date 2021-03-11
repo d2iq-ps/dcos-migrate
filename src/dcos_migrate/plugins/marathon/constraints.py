@@ -11,9 +11,9 @@ from .mapping_utils import Translated
 
 
 def translate_constraints(
-        app_pod_labels: Mapping[str, str],
-        constraints: List[List[Any]],
-    ) -> Tuple[Translated, Set[str]]:
+    app_pod_labels: Mapping[str, str],
+    constraints: List[List[Any]],
+) -> Tuple[Translated, Set[str]]:
 
     mappers: List[_ConstraintMapper] = [
         _PodAntiAffinityMapper(app_pod_labels),
@@ -37,7 +37,6 @@ def translate_constraints(
 
 
 class _ConstraintMapper(abc.ABC):
-
     @abc.abstractmethod
     def consume(self, constraint: List[Any]) -> bool:
         """Returns True if this mapper can translate this constraint."""
@@ -69,15 +68,21 @@ class _PodAntiAffinityMapper(_ConstraintMapper):
         if not _is_unique_hostname_constraint(constraint):
             return False
 
-        self._result = (
-            Translated(pod_spec_update({"affinity": {"podAntiAffinity": {
-                "requiredDuringSchedulingIgnoredDuringExecution": [{
-                    "labelSelector": {"matchLabels": self._app_pod_labels},
-                    "topologyKey": "kubernetes.io/hostname",
-                }],
-            }}})),
-            {"kubernetes.io/hostname",}
-        )
+        self._result = (Translated(
+            pod_spec_update({
+                "affinity": {
+                    "podAntiAffinity": {
+                        "requiredDuringSchedulingIgnoredDuringExecution": [{
+                            "labelSelector": {
+                                "matchLabels": self._app_pod_labels
+                            },
+                            "topologyKey": "kubernetes.io/hostname",
+                        }],
+                    }
+                }
+            })), {
+                "kubernetes.io/hostname",
+            })
         return True
 
     def result(self) -> Tuple[Translated, Set[str]]:
@@ -88,7 +93,6 @@ class _TopologySpreadMapper(_ConstraintMapper):
     """
     Handles Marathon constraints that can be approximated by K8s topologySpreadConstraints.
     """
-
     def __init__(self, app_pod_labels: Mapping[str, str]):
         self._app_pod_labels = app_pod_labels
         self._topology_fields: List[str] = []
@@ -101,14 +105,12 @@ class _TopologySpreadMapper(_ConstraintMapper):
         self._topology_fields.append(constraint[0])
         return True
 
-
     __SPECIAL_FIELD_MAPPING = {
         "hostname": "kubernetes.io/hostname",
         "@hostname": "kubernetes.io/hostname",
         "@region": "topology.kubernetes.io/region",
         "@zone": "topology.kubernetes.io/zone",
     }
-
 
     def result(self) -> Tuple[Translated, Set[str]]:
         if not self._topology_fields:
@@ -129,15 +131,17 @@ class _TopologySpreadMapper(_ConstraintMapper):
                 "maxSkew": 1,
                 "topologyKey": topology_key,
                 "whenUnsatisfiable": "DoNotSchedule",
-                "labelSelector": {"matchLabels": self._app_pod_labels},
+                "labelSelector": {
+                    "matchLabels": self._app_pod_labels
+                },
             })
 
         return (
-            Translated(
-                update=pod_spec_update({"topologySpreadConstraints": topology_spread_constraints}),
-                warnings=[" Please check that topologySpreadConstraints generated from UNIQUE/MAX_PER"
-                          " are correct for your use case."]
-            ),
+            Translated(update=pod_spec_update({"topologySpreadConstraints": topology_spread_constraints}),
+                       warnings=[
+                           " Please check that topologySpreadConstraints generated from UNIQUE/MAX_PER"
+                           " are correct for your use case."
+                       ]),
             node_labels,
         )
 
@@ -149,7 +153,6 @@ class _NodeSelectorMapper(_ConstraintMapper):
     """
     Handles Marathon constraints that map onto K8s nodeSelector.
     """
-
     def __init__(self) -> None:
         self._label_values: Mapping[str, Set[str]] = defaultdict(set)
 
@@ -161,7 +164,6 @@ class _NodeSelectorMapper(_ConstraintMapper):
         "@region": "topology.kubernetes.io/region",
         "@zone": "topology.kubernetes.io/zone",
     }
-
 
     def consume(self, constraint: List[Any]) -> bool:
         try:
@@ -179,7 +181,6 @@ class _NodeSelectorMapper(_ConstraintMapper):
         self._label_values[label].add(value)
         return True
 
-
     def result(self) -> Tuple[Translated, Set[str]]:
         node_selector = {}
         warnings = []
@@ -194,8 +195,6 @@ class _NodeSelectorMapper(_ConstraintMapper):
                             " is set on nodes".format(self.__FORMER_DCOS_HOSTNAME_LABEL))
 
         return (
-            Translated(
-                update=pod_spec_update({"nodeSelector": node_selector}),
-                warnings=warnings),
+            Translated(update=pod_spec_update({"nodeSelector": node_selector}), warnings=warnings),
             set(node_selector),
         )

@@ -15,7 +15,8 @@ class MetronomePlugin(MigratePlugin):
     def __init__(self) -> None:
         super(MetronomePlugin, self).__init__()
 
-    def backup(self, client: DCOSClient, **kwargs) -> BackupList:  # type: ignore
+    def backup(  # type: ignore
+            self, client: DCOSClient, **kwargs) -> BackupList:
         bl = BackupList()
         jobs = client.get(f"{client.dcos_url}/service/metronome/v1/jobs").json()
         for job in jobs:
@@ -30,15 +31,11 @@ class MetronomePlugin(MigratePlugin):
             data=job,
         )
 
-    def migrate(
-        self, backupList: BackupList, manifestList: ManifestList, **kwargs: T.Any
-    ) -> ManifestList:
+    def migrate(self, backupList: BackupList, manifestList: ManifestList, **kwargs: T.Any) -> ManifestList:
         ml = ManifestList()
 
         for b in backupList.backups(pluginName=self.plugin_name):
-            mig = MetronomeMigrator(
-                backup=b, backup_list=backupList, manifest_list=manifestList
-            )
+            mig = MetronomeMigrator(backup=b, backup_list=backupList, manifest_list=manifestList)
 
             manifest = mig.migrate()
             if manifest:

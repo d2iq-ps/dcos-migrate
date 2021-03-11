@@ -58,12 +58,10 @@ def test_simple_with_secret():
         assert m.manifest[0].metadata.labels['app'] == app_label
         assert m.manifest[0].spec.template.spec.containers[0].env[
             0].value_from.secret_key_ref.name == "marathonsecret-group1.predictionio-server"
-        assert m.manifest[0].spec.template.spec.containers[0].env[
-            0].value_from.secret_key_ref.key == "secret1"
+        assert m.manifest[0].spec.template.spec.containers[0].env[0].value_from.secret_key_ref.key == "secret1"
         assert m.manifest[0].spec.template.spec.containers[0].env[
             1].value_from.secret_key_ref.name == "marathonsecret-group1.predictionio-server"
-        assert m.manifest[0].spec.template.spec.containers[0].env[
-            1].value_from.secret_key_ref.key == "test.secret2"
+        assert m.manifest[0].spec.template.spec.containers[0].env[1].value_from.secret_key_ref.key == "test.secret2"
 
         assert m.manifest[1].kind == 'Service'
         assert m.manifest[1].spec.selector['app'] == app_label
@@ -76,27 +74,36 @@ def test_docker_pull_config_secret():
     pull_config_str = '{"auths":{"example.com":{"username":"jd","password":"deadbeef",'\
                       '"email":"jdoe@example.com","auth":"f00BA7"}}}'
 
-    migrated_dcos_secret = V1Secret(
-        kind='Secret',
-        api_version='v1',
-        metadata=V1ObjectMeta(name='nothing-depends-on-this-name'),
-        data={'nothing-depends-on-the-name-of-this-key': pull_config_str}
-    )
+    migrated_dcos_secret = V1Secret(kind='Secret',
+                                    api_version='v1',
+                                    metadata=V1ObjectMeta(name='nothing-depends-on-this-name'),
+                                    data={'nothing-depends-on-the-name-of-this-key': pull_config_str})
 
     input_manifest_list = ManifestList()
-    input_manifest_list.append(Manifest(
-        pluginName="secret",
-        manifestName="foo.docker-c_nfig",
-        data=[migrated_dcos_secret])
-    )
+    input_manifest_list.append(
+        Manifest(pluginName="secret", manifestName="foo.docker-c_nfig", data=[migrated_dcos_secret]))
 
     app = {
         "id": "/foo/barify",
-        "container": {"docker": {"pullConfig": {"secret": "pull-config"}}},
-        "env": {"BAR": {"secret": "pull-config"}}, # See the NOTE below
+        "container": {
+            "docker": {
+                "pullConfig": {
+                    "secret": "pull-config"
+                }
+            }
+        },
+        "env": {
+            "BAR": {
+                "secret": "pull-config"
+            }
+        },  # See the NOTE below
         "secrets": {
-            "pull-config": {"source": "/foo/docker-c@nfig"},
-            "unused": {"source": "unused"},
+            "pull-config": {
+                "source": "/foo/docker-c@nfig"
+            },
+            "unused": {
+                "source": "unused"
+            },
         },
     }
 
@@ -114,7 +121,6 @@ def test_docker_pull_config_secret():
     [generic_secret] = [m for m in manifest \
         if isinstance(m, V1Secret) and m.type != "kubernetes.io/dockerconfigjson"]
 
-
     assert deployment.spec.template.spec.image_pull_secrets[0].name == pull_secret.metadata.name
 
     assert pull_secret.data[".dockerconfigjson"] == pull_config_str
@@ -124,13 +130,12 @@ def test_docker_pull_config_secret():
 
 def test_constraint_node_labels():
     apps = [{
-            "id": "/foo",
-            "constraints": [["@hostname", "IS", "10.123.45.67"], ["baz", "UNIQUE"]]
-        },
-        {
-            "id": "/bar",
-            "constraints": [["@zone", "LIKE", "antarctic1"], ["baz", "UNIQUE"]]
-        }]
+        "id": "/foo",
+        "constraints": [["@hostname", "IS", "10.123.45.67"], ["baz", "UNIQUE"]]
+    }, {
+        "id": "/bar",
+        "constraints": [["@zone", "LIKE", "antarctic1"], ["baz", "UNIQUE"]]
+    }]
 
     tracker = NodeLabelTracker()
 
