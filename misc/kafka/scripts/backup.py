@@ -40,7 +40,7 @@ def _sanitize_and_merge_envs(app_env: dict, task_env: dict) -> dict:
 
 
 def download_dcos_package(app_id: str, target_dir: str, version: str):
-    """Downoads the marathon definition of the deployed kafka service."""
+    """Downloads the marathon definition of the deployed kafka service."""
     log.info("Validating DC/OS CLI is setup correctly")
     run_cmd("{} --version".format(DCOS), check=True)
     log.info("Validating DC/OS Kafka Service and CLI are setup correctly")
