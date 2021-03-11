@@ -143,3 +143,11 @@ def test_constraint_node_labels():
         "topology.kubernetes.io/zone": {'/bar'},
         "dcos.io/former-dcos-hostname": {'/foo'}
     }
+
+
+def test_dcos_apps_are_skipped():
+    app = {"id": "/foo", "labels": {"DCOS_PACKAGE_FRAMEWORK_NAME": "dcos-foo"}}
+
+    migrator = MarathonMigrator(object=app)
+    manifest = migrator.migrate()
+    assert not manifest

@@ -7,8 +7,9 @@ from .app_translator import ContainerDefaults, translate_app, Settings
 from .app_secrets import TrackingAppSecretMapping, SecretRemapping
 from .service_translator import translate_service
 
-from collections import defaultdict
+import logging
 from typing import Any, DefaultDict, Mapping, Optional, Set
+from collections import defaultdict
 
 
 class NodeLabelTracker(object):
@@ -55,6 +56,16 @@ class MarathonMigrator(Migrator):
         }
 
     def translate_marathon(self, key: str, value: str, full_path: str) -> None:
+        if self.object is None:
+            raise Exception("self.object is not set; this is a bug")
+
+        labels = self.object.get('labels', {})
+        dcos_package_framework_name = labels.get("DCOS_PACKAGE_FRAMEWORK_NAME")
+        if dcos_package_framework_name:
+            logging.warning('Not translating app %s: it runs Mesos framework %s',
+                            value, dcos_package_framework_name)
+            return
+
         settings = Settings(
             container_defaults=ContainerDefaults("alpine:latest", "/"),
             app_secret_mapping=self._secret_mapping,
