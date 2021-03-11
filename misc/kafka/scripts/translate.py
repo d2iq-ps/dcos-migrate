@@ -84,6 +84,8 @@ def print_instructions_kafka(
     print(separator)
     print(colors.HEADER + "Install KUDO Kafka" + colors.ENDC)
     print(separator)
+    print(colors.WARNING + WARNING.format(target_file) + colors.ENDC)
+    print(separator)
     print(
         colors.OKGREEN +
         "Run the following command to install KUDO Kafka on DKP: {}".format(
@@ -97,8 +99,7 @@ def print_instructions_kafka(
         ) + colors.ENDC
     )
     print(separator)
-    print(colors.WARNING + WARNING.format(target_file) + colors.ENDC)
-    print(separator)
+    
     print(
         colors.OKGREEN +
         "Run the following command to check the status: {}".format(
@@ -152,7 +153,6 @@ def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
     # Convert Broker Memory from MB to GiB
     src_envs["BROKER_MEM"] = str(math.ceil(float(src_envs["BROKER_MEM"]) / 1024)) + "Gi"
 
-    print(target_file)
     with open(target_file, "w") as f:
         for tmpl in tmpl_lines:
             tmpl_key, tmpl_value = tmpl.split(":")

@@ -116,16 +116,6 @@ Make sure plan shows COMPELTE, before proceeding further.
 --------------------------------------------------
 Install KUDO Kafka
 --------------------------------------------------
-Run the following command to install KUDO Kafka on DKP: 
-kubectl kudo install \
-    --namespace default \
-    --instance kafka-instance \
-    --parameter-file ./kafka_home/params.yml \
-    --operator-version 1.3.3 \
-    kafka
-
---------------------------------------------------
-
 WARNING: ALL THE PARAMETERS ARE GENERATED AS PER THE DCOS VERSION OF THE SERVICE, IT MIGHT NOT BE THE BEST FOR K8s.
 SO BEFORE INSTALLING THE SERVICE PLEASE OPEN A TARGET FILE (./kafka_home/params.yml) AND MODIFY VALUES AS PER THE AVAILABILITY ON THE K8s CLUSTER.
 SPECIALLY VALUES OF THESE FIELDS SHOULD BE ADJUSTED AS PER THE CLUSTER:
@@ -133,6 +123,14 @@ BROKER_COUNT
 BROKER_CPUS
 BROKER_MEM
 DISK_SIZE
+--------------------------------------------------
+Run the following command to install KUDO Kafka on DKP: 
+kubectl kudo install \
+    --namespace default \
+    --instance kafka-instance \
+    --parameter-file ./kafka_home/params.yml \
+    --operator-version 1.3.3 \
+    kafka
 
 --------------------------------------------------
 Run the following command to check the status: 
