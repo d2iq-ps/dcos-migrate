@@ -31,7 +31,7 @@ spec:
               value: envVal
             image: alpine
             imagePullPolicy: Always
-            name: hello-world
+            name: job
             resources:
               limits:
                 cpu: 1
