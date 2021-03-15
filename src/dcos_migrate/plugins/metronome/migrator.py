@@ -195,7 +195,7 @@ class MetronomeMigrator(Migrator):
     def handleLimitsDisk(self, key: str, value: float, full_path: str) -> None:
         if value == 0:
             return
-        self.container.resources.limits["ephemeral-storage"] = value
+        self.container.resources.limits["ephemeral-storage"] = str(value) + "Mi"
 
     def handleLimitsGPUs(self, key: str, value: float, full_path: str) -> None:
         self.container.resources.requests["nvidia.com/gpu"] = value
