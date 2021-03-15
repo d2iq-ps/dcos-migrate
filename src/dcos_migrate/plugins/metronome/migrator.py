@@ -88,7 +88,7 @@ class MetronomeMigrator(Migrator):
 
         # intentionally written this way so one can easily scan down paths
         container1 = K.V1Container(
-            name=name,
+            name="job",
             resources=K.V1ResourceRequirements(limits={}, requests={}),
         )
         self.manifest = Manifest(
