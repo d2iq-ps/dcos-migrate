@@ -18,7 +18,7 @@ class MetronomePlugin(MigratePlugin):
     def backup(  # type: ignore
             self, client: DCOSClient, **kwargs) -> BackupList:
         bl = BackupList()
-        jobs = client.get(f"{client.dcos_url}/service/metronome/v1/jobs").json()
+        jobs = client.get(f"{client.dcos_url}/service/metronome/v1/jobs?embed=schedules").json()
         for job in jobs:
             bl.append(self.createBackup(job))
 
