@@ -12,13 +12,17 @@ class Backup(object):
         self._name = backupName
         self._data = data
         self._extension = extension
-        self._serializer = json.dumps
+        self._serializer = self.dump_pretty
         self._deserializer = json.loads
 
     @staticmethod
     def renderBackupName(name: str) -> str:
         # replace path with dashes
         return "-".join(list(filter(None, name.split("/"))))
+
+    @staticmethod
+    def dump_pretty(obj: Any, **kwargs: Any) -> str:
+        return json.dumps(obj, indent=4, **kwargs)
 
     @property
     def plugin_name(self) -> str:
