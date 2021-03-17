@@ -172,7 +172,7 @@ class MetronomeMigrator(Migrator):
     def handleSecret(self, key: str, value: T.Dict[str, str], full_path: str) -> None:
         if not self.jobSecret:
             assert self.object
-            name = self.dnsify("jobSecret." + str(self.object.get("id", "")))
+            name = self.dnsify("jobsecret." + str(self.object.get("id", "")))
             metadata = K.V1ObjectMeta(name=name)
             assert self.manifest_list
             clusterMeta = self.manifest_list.clusterMeta()

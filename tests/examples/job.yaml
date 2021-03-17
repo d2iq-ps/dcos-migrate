@@ -26,7 +26,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: secret0
-                  name: jobSecret.hello-world
+                  name: jobsecret.hello-world
             - name: envKey
               value: envVal
             image: alpine
@@ -77,6 +77,6 @@ metadata:
     migration.dcos.d2iq.com/cluster-id: test-1234-test-test
     migration.dcos.d2iq.com/cluster-name: testcluster
     migration.dcos.d2iq.com/backup-date: '2021-01-25'
-  name: jobSecret.hello-world
+  name: jobsecret.hello-world
 data:
   secret0: Zm9vYmFy
