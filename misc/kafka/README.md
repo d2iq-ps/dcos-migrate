@@ -55,7 +55,7 @@ optional arguments:
                         Folder to hold configuration of running DC/OS Kafka service (defaults to ./kafka_home)
   --app-id APP_ID       Service Name (defaults to kafka)
   --only-conf ONLY_CONF
-                        Set True if only service configuration is required, no data backup (defaults to True)
+                        Set True if only service configuration is required, no data backup (defaults to true)
   --app-version APP_VERSION
                         Service Version (defaults to 2.5.1-1.3.3)
 
