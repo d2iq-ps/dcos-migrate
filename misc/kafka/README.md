@@ -64,7 +64,7 @@ optional arguments:
 `TARGET_DIR` defaults to `$(pwd)/kafka_home`. The `--only-conf` option is set to `true` as the kafka migration utility currently only supports configuration migration.
 
 
-### `2.install`
+### `2. Install`
 
 The `install` command generates a `TARGET_FILE` (that defaults to `$(pwd)/kafka_home/params.yml` ) and prints instructions on how to use it to install in KUDO Kafka on DKP. Other parameters such as `namespace` and `instance` have sensible defaults in accordance with the upstream kudo operator definition but can be customized.
 
