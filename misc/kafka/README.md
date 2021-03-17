@@ -61,7 +61,7 @@ optional arguments:
 
 ```
 
-`TARGET_DIR` defaults to `$(pwd)/kafka_home`. `--only-conf` option is set to `True` as kafka migration utility currently supports configuration migration.
+`TARGET_DIR` defaults to `$(pwd)/kafka_home`. The `--only-conf` option is set to `true` as the kafka migration utility currently only supports configuration migration.
 
 
 ### `2.install`
@@ -142,4 +142,3 @@ kubectl kudo plan status \
 Make sure plan shows COMPELTE, before proceeding further.
 --------------------------------------------------
 ```
-
