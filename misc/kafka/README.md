@@ -40,7 +40,7 @@ Kafka configuration migration is performed using `backup` and `install` commands
 
 These steps are explained in following steps:
 
-### `1.backup`
+### `1. Backup`
 
 By providing a service name or app-id (defaults to `/kafka`), all the configuration can be downloaded to local file system and data can be backed up to S3.
 
