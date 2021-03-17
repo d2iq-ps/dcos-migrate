@@ -1,6 +1,6 @@
 # kafka Migration Tool
 
-This tool migrates the service configuration and metadate of Kafka from DCOS to DKP.
+This tool migrates the service configuration and metadata of Kafka from DCOS to DKP.
 ## Prerequisites
 
 - `python3` installed in the environment
@@ -142,5 +142,4 @@ kubectl kudo plan status \
 Make sure plan shows COMPELTE, before proceeding further.
 --------------------------------------------------
 ```
-
 
