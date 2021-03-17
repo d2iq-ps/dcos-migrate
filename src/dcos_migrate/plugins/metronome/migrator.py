@@ -116,6 +116,9 @@ class MetronomeMigrator(Migrator):
         )
 
     def handleArtifacts(self, key: str, value: T.List[T.Any], full_path: str) -> None:
+        if len(value) < 1:
+            return
+
         def iter_command() -> T.Generator[str, None, None]:
             yield "set -x"
             yield "set -e"
