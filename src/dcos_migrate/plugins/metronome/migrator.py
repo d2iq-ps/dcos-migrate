@@ -189,12 +189,12 @@ class MetronomeMigrator(Migrator):
             # logging.critical("{}.source missing", full_path)
             return
 
-        source_key = utils.make_subdomain(sourceSecretName.split('/'))
+        source_key = utils.dnsify(sourceSecretName)
         assert self.manifest_list
         sourceSecret = self.manifest_list.manifest(pluginName='secret', manifestName=source_key)
         if not sourceSecret:
             # logging.warning("secret {} missing", source_key)
-            self.jobSecret.data[key] = ""
+            self.jobSecret.data[key] = "{} not found".format(source_key)
             return
 
         [v] = sourceSecret[0].data.values()

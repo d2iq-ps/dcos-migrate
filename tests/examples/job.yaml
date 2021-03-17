@@ -79,4 +79,4 @@ metadata:
     migration.dcos.d2iq.com/backup-date: '2021-01-25'
   name: jobSecret.hello-world
 data:
-  secret0: ''
+  secret0: Zm9vYmFy
