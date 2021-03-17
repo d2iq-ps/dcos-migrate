@@ -1,4 +1,5 @@
 from dcos_migrate.system import Migrator, Manifest
+import dcos_migrate.utils as utils
 import kubernetes.client.models as K  # type: ignore
 import json
 import os
@@ -32,13 +33,15 @@ class MetronomeMigrator(Migrator):
         self.manifest: "Manifest"
         self.image = defaultImage
         self.workingDir = workingDir
+        self.jobSecret: T.Any = None
         self._warnings: T.Dict[str, str] = dict()
         self.translate = {
             "id": self.initCronJob,
             # id comes first to init our manifest object...
+            "run.secrets.*": self.handleSecret,
             "dependencies|run.docker.parameters": self.noEquivalent,
             "description": self.handleDescription,
-            "env": self.handleEnv,
+            "run.env": self.handleEnv,
             "labels.*": self.handleLabels,
             "run.args": self.handleRunArgs,
             "run.artifacts": self.handleArtifacts,
@@ -60,7 +63,6 @@ class MetronomeMigrator(Migrator):
             "run.user": self.handleUser,
             "run.volumes": self.handleVolumes,
             "schedules[0]": self.handleSchedule,
-            # "secrets": do not need to be handled explicitly. run.env will use its data.
         }
 
     @property
@@ -116,6 +118,9 @@ class MetronomeMigrator(Migrator):
         )
 
     def handleArtifacts(self, key: str, value: T.List[T.Any], full_path: str) -> None:
+        if len(value) < 1:
+            return
+
         def iter_command() -> T.Generator[str, None, None]:
             yield "set -x"
             yield "set -e"
@@ -164,14 +169,50 @@ class MetronomeMigrator(Migrator):
     def handleDescription(self, key: str, value: str, full_path: str) -> None:
         self.cronJob.metadata.annotations["migration.dcos.d2iq.com/description"] = value
 
+    def handleSecret(self, key: str, value: T.Dict[str, str], full_path: str) -> None:
+        if not self.jobSecret:
+            assert self.object
+            name = self.dnsify("jobsecret." + str(self.object.get("id", "")))
+            metadata = K.V1ObjectMeta(name=name)
+            assert self.manifest_list
+            clusterMeta = self.manifest_list.clusterMeta()
+            if clusterMeta:
+                metadata.annotations = clusterMeta.annotations
+            self.jobSecret = K.V1Secret(metadata=metadata, data={})
+            self.jobSecret.api_version = 'v1'
+            self.jobSecret.kind = 'Secret'
+            self.manifest.append(self.jobSecret)
+
+        sourceSecretName = value.get("source", "")
+
+        if not sourceSecretName:
+            # logging.critical("{}.source missing", full_path)
+            return
+
+        source_key = utils.dnsify(sourceSecretName)
+        assert self.manifest_list
+        sourceSecret = self.manifest_list.manifest(pluginName='secret', manifestName=source_key)
+        if not sourceSecret:
+            # logging.warning("secret {} missing", source_key)
+            self.jobSecret.data[key] = "{} not found".format(source_key)
+            return
+
+        [v] = sourceSecret[0].data.values()
+
+        self.jobSecret.data[key] = v
+
     def handleEnv(self, key: str, value: T.Dict[str, T.Any], full_path: str) -> None:
         env = []
         for k, v in value.items():
             if "secret" in v:
-                assert self.object
-                keyRef = self.dnsify(self.object.get("secrets", {}).get(v["secret"], {}).get("source"))
+                if not self.jobSecret:
+                    # logging.critical("No secret found")
+                    return
+
+                keyRef = self.jobSecret.metadata.name
+
                 # TODO: find ref from secrets metadata
-                key_selector = K.V1SecretKeySelector(key=keyRef, name="TODO_ref")
+                key_selector = K.V1SecretKeySelector(key=v["secret"], name=keyRef)
                 env_var_src = K.V1EnvVarSource(secret_key_ref=key_selector)
                 env.append(K.V1EnvVar(name=k, value_from=env_var_src))
             else:

@@ -48,8 +48,8 @@ class ClusterPlugin(MigratePlugin):
         metadata = V1ObjectMeta(name="dcos-{}".format(clusterBackup.data['CLUSTER_ID']))
         metadata.annotations = {
             utils.namespace_path("cluster-id"): clusterBackup.data['CLUSTER_ID'],
-            utils.namespace_path("cluster-id"): clusterBackup.data['CLUSTER'],
-            utils.namespace_path("cluster-id"): clusterBackup.data['BACKUP_DATE'],
+            utils.namespace_path("cluster-name"): clusterBackup.data['CLUSTER'],
+            utils.namespace_path("backup-date"): clusterBackup.data['BACKUP_DATE'],
         }
         cfgmap = V1ConfigMap(metadata=metadata)
         # models do not set defaults -.-
