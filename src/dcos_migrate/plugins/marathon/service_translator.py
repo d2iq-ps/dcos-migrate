@@ -36,11 +36,9 @@ def __check_conflicts(app_ports: Sequence[AppPort]) -> Sequence[str]:
     for i, a in enumerate(app_ports):
         for b in app_ports[i + 1:]:
             if effective_port(a) == effective_port(b):
-                warnings.append(
-                    "Port '{}' and port '{}' conflict. "
-                    "This is probably due to the service having a mix of auto-assigned ports.".format(
-                        a.name,
-                        b.name))
+                warnings.append("Port '{}' and port '{}' conflict. "
+                                "This is probably due to the service having a mix of auto-assigned ports.".format(
+                                    a.name, b.name))
     return warnings
 
 
@@ -56,10 +54,7 @@ def __convert_k8s_ports(app_ports: Sequence[AppPort]) -> Tuple[Sequence[str], Se
                 protocol = "TCP"
 
             source_port = effective_port(port)
-            service_port: K8sPort = {
-                "port": source_port,
-                "protocol": protocol.upper()
-            }
+            service_port: K8sPort = {"port": source_port, "protocol": protocol.upper()}
             if port.containerPort != source_port:
                 service_port["targetPort"] = port.containerPort
 
@@ -128,13 +123,7 @@ def translate_service(app_label: str, app: Dict[str, Any]) -> Tuple[Optional[Dic
         if "host" in network_modes:
             warnings += [HOST_NETWORKING_WARNING]
 
-        service_spec: Dict[str, Any] = {
-            "type": "ClusterIP",
-            "selector": {
-                "app": app_label
-            },
-            "ports": service_ports
-        }
+        service_spec: Dict[str, Any] = {"type": "ClusterIP", "selector": {"app": app_label}, "ports": service_ports}
 
         if static_cluster_ip:
             service_spec["clusterIP"] = static_cluster_ip
@@ -147,9 +136,4 @@ def translate_service(app_label: str, app: Dict[str, Any]) -> Tuple[Optional[Dic
         api_version = "v1"
         kind = "Service"
 
-        return {
-                   "apiVersion": api_version,
-                   "kind": kind,
-                   "metadata": metadata,
-                   "spec": service_spec
-               }, warnings
+        return {"apiVersion": api_version, "kind": kind, "metadata": metadata, "spec": service_spec}, warnings
