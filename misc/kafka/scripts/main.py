@@ -69,7 +69,7 @@ def main():
         "--only-conf",
         type=bool,
         default=True,
-        help="Set True if only service configuration is required, no data backup (defaults to True)",
+        help="Set True if only service configuration is required, no data backup (defaults to true)",
     )
     backup_cmd.add_argument(
         "--app-version",
