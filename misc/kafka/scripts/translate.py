@@ -19,9 +19,7 @@ DISK_SIZE
 """
 
 
-def print_instructions_zk(
-    namespace: str, instance: str, target_file: str, version: str
-):
+def print_instructions_zk(namespace: str, instance: str, target_file: str, version: str):
     separator = "--------------------------------------------------"
 
     KUDO_CMD = """
@@ -38,33 +36,17 @@ def print_instructions_zk(
     print(separator)
     print(colors.HEADER + "Install KUDO Zookeeper" + colors.ENDC)
     print(separator)
-    print(
-        colors.OKGREEN +
-        "Run the following command to install KUDO Zookeeper on DKP: {}".format(
-            KUDO_CMD.format(
-                kubectl=KUBECTL,
-                namespace=namespace,
-                instance=instance
-            )
-        ) + colors.ENDC
-    )
+    print(colors.OKGREEN + "Run the following command to install KUDO Zookeeper on DKP: {}".format(
+        KUDO_CMD.format(kubectl=KUBECTL, namespace=namespace, instance=instance)) + colors.ENDC)
     print(separator)
-    print(
-        colors.OKGREEN +
-        "Run the following command to check the status: {}".format(
-            KUDO_STATUS_CMD.format(
-                kubectl=KUBECTL, namespace=namespace, instance=instance
-            )
-        ) + colors.ENDC
-    )
+    print(colors.OKGREEN + "Run the following command to check the status: {}".format(
+        KUDO_STATUS_CMD.format(kubectl=KUBECTL, namespace=namespace, instance=instance)) + colors.ENDC)
     print(separator)
     print(colors.BOLD + "Make sure plan shows COMPELTE, before proceeding further." + colors.ENDC)
     print(separator)
 
 
-def print_instructions_kafka(
-    namespace: str, instance: str, target_file: str, version: str
-):
+def print_instructions_kafka(namespace: str, instance: str, target_file: str, version: str):
     separator = "--------------------------------------------------"
 
     KUDO_CMD = """
@@ -86,41 +68,27 @@ def print_instructions_kafka(
     print(separator)
     print(colors.WARNING + WARNING.format(target_file) + colors.ENDC)
     print(separator)
-    print(
-        colors.OKGREEN +
-        "Run the following command to install KUDO Kafka on DKP: {}".format(
-            KUDO_CMD.format(
-                kubectl=KUBECTL,
-                namespace=namespace,
-                instance=instance,
-                target_file=target_file,
-                version=version,
-            )
-        ) + colors.ENDC
-    )
+    print(colors.OKGREEN + "Run the following command to install KUDO Kafka on DKP: {}".format(
+        KUDO_CMD.format(
+            kubectl=KUBECTL,
+            namespace=namespace,
+            instance=instance,
+            target_file=target_file,
+            version=version,
+        )) + colors.ENDC)
     print(separator)
-    
-    print(
-        colors.OKGREEN +
-        "Run the following command to check the status: {}".format(
-            KUDO_STATUS_CMD.format(
-                kubectl=KUBECTL, namespace=namespace, instance=instance
-            )
-        ) + colors.ENDC
-    )
+
+    print(colors.OKGREEN + "Run the following command to check the status: {}".format(
+        KUDO_STATUS_CMD.format(kubectl=KUBECTL, namespace=namespace, instance=instance)) + colors.ENDC)
     print(separator)
     print(colors.BOLD + "Make sure plan shows COMPELTE, before proceeding further." + colors.ENDC)
     print(separator)
 
 
 def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
-    log.info(
-        f'Using "{src_file}" file to migrate to kubernetes configuration at "{target_file}"'
-    )
+    log.info(f'Using "{src_file}" file to migrate to kubernetes configuration at "{target_file}"')
 
-    tmpl_file = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "../resources/params.yaml.tmpl"
-    )
+    tmpl_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../resources/params.yaml.tmpl")
 
     if not os.path.exists(src_file):
         log.error("Mesos configuration file {} does not exists!".format(src_file))
@@ -138,17 +106,12 @@ def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
 
     # Add zookeeper URI
     src_envs[
-        "KAFKA_ZOOKEEPER_URI"
-    ] = "zookeeper-instance-zookeeper-0.zookeeper-instance-hs:2181,zookeeper-instance-zookeeper-1.zookeeper-instance-hs:2181,zookeeper-instance-zookeeper-2.zookeeper-instance-hs:2181"
+        "KAFKA_ZOOKEEPER_URI"] = "zookeeper-instance-zookeeper-0.zookeeper-instance-hs:2181,zookeeper-instance-zookeeper-1.zookeeper-instance-hs:2181,zookeeper-instance-zookeeper-2.zookeeper-instance-hs:2181"
     # Convert Disk Size from MB to GiB
-    src_envs["BROKER_DISK_SIZE"] = (
-        str(math.ceil(float(src_envs["BROKER_DISK_SIZE"]) / 1000)) + "Gi"
-    )
+    src_envs["BROKER_DISK_SIZE"] = (str(math.ceil(float(src_envs["BROKER_DISK_SIZE"]) / 1000)) + "Gi")
 
     # Round of the value of CPU
-    src_envs["BROKER_CPUS"] = (
-        str(math.ceil(float(src_envs["BROKER_CPUS"]) * 1000)) + "m"
-    )
+    src_envs["BROKER_CPUS"] = (str(math.ceil(float(src_envs["BROKER_CPUS"]) * 1000)) + "m")
 
     # Convert Broker Memory from MB to GiB
     src_envs["BROKER_MEM"] = str(math.ceil(float(src_envs["BROKER_MEM"]) / 1024)) + "Gi"

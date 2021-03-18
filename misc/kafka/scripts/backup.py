@@ -13,9 +13,7 @@ def _fetch_tasks_envs(app_id: str, task_count: int) -> dict:
     """Pulls task configuration"""
     envs = {}
     for task in range(task_count):
-        task_name = remove_prefix(app_id, "/").replace(
-            "/", "."
-        ) + "__kafka-{}-broker__".format(task)
+        task_name = remove_prefix(app_id, "/").replace("/", ".") + "__kafka-{}-broker__".format(task)
         log.info("Downloading configuration from task: {}".format(task_name))
         _, out, err = run_cmd("{} task exec {} bash -c 'env'".format(DCOS, task_name))
         for env in out.split("\n"):
@@ -56,20 +54,14 @@ def download_dcos_package(app_id: str, target_dir: str, version: str):
     app = json.loads(out, encoding=encoding)
     os.makedirs(target_dir, exist_ok=True)
     if len(os.listdir(target_dir)) != 0:
-        log.fatal(
-            'Provided directory "{}" is not empty. Use an empty directory to prevent data corruption.'.format(
-                target_dir
-            )
-        )
+        log.fatal('Provided directory "{}" is not empty. Use an empty directory to prevent data corruption.'.format(
+            target_dir))
     with open(os.path.join(target_dir, MARATHON_JSON), "w+") as f:
         f.write(out)
     DCOS_PACKAGE_FRAMEWORK_NAME = app["labels"]["DCOS_PACKAGE_FRAMEWORK_NAME"]
     if DCOS_PACKAGE_FRAMEWORK_NAME not in ["kafka", "confluent-kafka"]:
-        log.error(
-            'Cannot migrate "{}" package. Supported packages are "Kafka and Confluent-Kafka"'.format(
-                DCOS_PACKAGE_FRAMEWORK_NAME
-            )
-        )
+        log.error('Cannot migrate "{}" package. Supported packages are "Kafka and Confluent-Kafka"'.format(
+            DCOS_PACKAGE_FRAMEWORK_NAME))
         return
     DCOS_PACKAGE_VERSION = app["labels"]["DCOS_PACKAGE_VERSION"]
     # TODO: @rishabh96b - Uncomment below snippet if migration faces version dependent issues.

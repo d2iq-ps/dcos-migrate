@@ -5,6 +5,7 @@ import sys
 # Constants
 encoding = "utf-8"
 
+
 class colors:
     """Beautify strings in terminal"""
     HEADER = '\033[95m'
@@ -18,7 +19,11 @@ class colors:
     UNDERLINE = '\033[4m'
 
 
-def run_cmd(cmd: str, print_output: bool = False, check: bool = True, timeout_seconds: int = 300, print_cmd: bool = False) -> [int, str, str]:
+def run_cmd(cmd: str,
+            print_output: bool = False,
+            check: bool = True,
+            timeout_seconds: int = 300,
+            print_cmd: bool = False) -> [int, str, str]:
     log.debug('Running command "{}"'.format(cmd, check))
     if print_cmd:
         print(cmd)
@@ -59,6 +64,7 @@ def run_cmd(cmd: str, print_output: bool = False, check: bool = True, timeout_se
         if check:
             sys.exit(e.returncode)
         return e.returncode, stdout, stderr
+
 
 def remove_prefix(base: str, prefix: str) -> str:
     if base.startswith(prefix):

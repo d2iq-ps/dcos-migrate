@@ -7,11 +7,8 @@ import translate
 
 
 def download(args):
-    log.info(
-        "Downloading DC/OS package with app id {} of version {} into target directory {}".format(
-            args.app_id, args.app_version, args.target_dir
-        )
-    )
+    log.info("Downloading DC/OS package with app id {} of version {} into target directory {}".format(
+        args.app_id, args.app_version, args.target_dir))
     backup.download_dcos_package(args.app_id, args.target_dir, args.app_version)
 
 
@@ -20,13 +17,9 @@ def install(args):
     is_ok = translate.translate_mesos_to_k8s(args.config_file, args.target_file)
     if is_ok:
         # Print installation instructions for zookeeper
-        translate.print_instructions_zk(
-            args.namespace, "zookeeper-instance", args.target_file, args.operator_version
-        )
+        translate.print_instructions_zk(args.namespace, "zookeeper-instance", args.target_file, args.operator_version)
         # Print installation instructions for kafka
-        translate.print_instructions_kafka(
-            args.namespace, args.instance, args.target_file, args.operator_version
-        )
+        translate.print_instructions_kafka(args.namespace, args.instance, args.target_file, args.operator_version)
 
 
 def main():
@@ -62,9 +55,7 @@ def main():
         help="Backup the DC/OS package configurations and data",
         parents=[parent_parser],
     )
-    backup_cmd.add_argument(
-        "--app-id", type=str, default="kafka", help="Service Name (defaults to kafka)"
-    )
+    backup_cmd.add_argument("--app-id", type=str, default="kafka", help="Service Name (defaults to kafka)")
     backup_cmd.add_argument(
         "--only-conf",
         type=bool,
