@@ -7,8 +7,11 @@ import translate
 
 
 def download(args):
-    log.info("Downloading DC/OS package with app id {} of version {} into target directory {}".format(
-        args.app_id, args.app_version, args.target_dir))
+    log.info(
+        "Downloading DC/OS package with app id {} of version {} into target directory {}".format(
+            args.app_id, args.app_version, args.target_dir
+        )
+    )
     backup.download_dcos_package(args.app_id, args.target_dir, args.app_version)
 
 
@@ -17,9 +20,34 @@ def install(args):
     is_ok = translate.translate_mesos_to_k8s(args.config_file, args.target_file)
     if is_ok:
         # Print installation instructions for zookeeper
-        translate.print_instructions_zk(args.namespace, "zookeeper-instance", args.target_file, args.operator_version)
+        translate.print_instructions_zk(
+            args.namespace,
+            "zookeeper-instance",
+            args.target_file,
+            args.operator_version,
+        )
         # Print installation instructions for kafka
-        translate.print_instructions_kafka(args.namespace, args.instance, args.target_file, args.operator_version)
+        translate.print_instructions_kafka(
+            args.namespace, args.instance, args.target_file, args.operator_version
+        )
+
+
+def migrate(args):
+    pass
+
+
+def parse_migrate_params(args):
+    """Parses the parameters for migration related parameters"""
+    parsed_params = {}
+
+    if len(args.dcos_bootstrap_servers) == 0:
+        log.error("Missing value of --dcos-bootstrap-servers")
+        exit(1)
+    parsed_params[
+        "MIRROR_MAKER_EXTERNAL_BOOTSTRAP_SERVERS"
+    ] = args.dcos_bootstrap_servers
+
+    return parsed_params
 
 
 def main():
@@ -55,7 +83,9 @@ def main():
         help="Backup the DC/OS package configurations and data",
         parents=[parent_parser],
     )
-    backup_cmd.add_argument("--app-id", type=str, default="kafka", help="Service Name (defaults to kafka)")
+    backup_cmd.add_argument(
+        "--app-id", type=str, default="kafka", help="Service Name (defaults to kafka)"
+    )
     backup_cmd.add_argument(
         "--only-conf",
         type=bool,
@@ -108,6 +138,31 @@ def main():
         help="Kudo Kafka version (defaults to 1.3.3)",
     )
     install_cmd.set_defaults(func=install)
+
+    # Step 3 : Migrate the schema and data from DC/OS Kafka to KUDO Kafka
+    migrate_cmd = subparsers.add_parser(
+        "migrate",
+        help="Restore the Schema and Data from the backup of DC/OS Kafka to KUDO Kafka",
+    )
+    migrate_cmd.add_argument(
+        "--namespace",
+        type=str,
+        default="default",
+        help="Namespace of the kafka pods (defaults to default)",
+    )
+    migrate_cmd.add_argument(
+        "--instance",
+        type=str,
+        default="kafka-instance",
+        help="Name of the Kafka Kudo installation (defaults to kafka-instance)",
+    )
+    migrate_cmd.add_argument(
+        "--dcos-bootstrap-servers",
+        type=str,
+        default="",
+        help="Externally exposed DC/OS Kafka bootstrap servers.",
+    )
+    migrate_cmd.set_defaults(func=migrate)
 
     args = parser.parse_args()
     if len(sys.argv) == 1:
