@@ -7,11 +7,8 @@ import translate
 
 
 def download(args):
-    log.info(
-        "Downloading DC/OS package with app id {} of version {} into target directory {}".format(
-            args.app_id, args.app_version, args.target_dir
-        )
-    )
+    log.info("Downloading DC/OS package with app id {} of version {} into target directory {}".format(
+        args.app_id, args.app_version, args.target_dir))
     backup.download_dcos_package(args.app_id, args.target_dir, args.app_version)
 
 
@@ -27,9 +24,7 @@ def install(args):
             args.operator_version,
         )
         # Print installation instructions for kafka
-        translate.print_instructions_kafka(
-            args.namespace, args.instance, args.target_file, args.operator_version
-        )
+        translate.print_instructions_kafka(args.namespace, args.instance, args.target_file, args.operator_version)
 
 
 def migrate(args):
@@ -43,9 +38,7 @@ def parse_migrate_params(args):
     if len(args.dcos_bootstrap_servers) == 0:
         log.error("Missing value of --dcos-bootstrap-servers")
         exit(1)
-    parsed_params[
-        "MIRROR_MAKER_EXTERNAL_BOOTSTRAP_SERVERS"
-    ] = args.dcos_bootstrap_servers
+    parsed_params["MIRROR_MAKER_EXTERNAL_BOOTSTRAP_SERVERS"] = args.dcos_bootstrap_servers
 
     return parsed_params
 
@@ -83,9 +76,7 @@ def main():
         help="Backup the DC/OS package configurations and data",
         parents=[parent_parser],
     )
-    backup_cmd.add_argument(
-        "--app-id", type=str, default="kafka", help="Service Name (defaults to kafka)"
-    )
+    backup_cmd.add_argument("--app-id", type=str, default="kafka", help="Service Name (defaults to kafka)")
     backup_cmd.add_argument(
         "--only-conf",
         type=bool,
