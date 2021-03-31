@@ -4,6 +4,7 @@ import sys
 
 import backup
 import translate
+import migrate as mig
 
 
 def download(args):
@@ -28,10 +29,14 @@ def install(args):
 
 
 def migrate(args):
-    pass
+    # Get migration parameters
+    migration_params = parse_migrate_params(args)
+    # Print migration instructions for DC/OS Kafka to KUDO Kafka
+    mig.print_migration_instructions(args.namespace, args.instance,
+                                     migration_params["MIRROR_MAKER_EXTERNAL_BOOTSTRAP_SERVERS"])
 
 
-def parse_migrate_params(args):
+def parse_migrate_params(args) -> dict:
     """Parses the parameters for migration related parameters"""
     parsed_params = {}
 
