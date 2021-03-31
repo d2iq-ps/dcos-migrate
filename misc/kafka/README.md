@@ -142,3 +142,38 @@ kubectl kudo plan status \
 Make sure plan shows COMPELTE, before proceeding further.
 --------------------------------------------------
 ```
+
+### `3. Migrate`
+
+KUDO Kafka comes with [MirrorMaker](https://cwiki.apache.org/confluence/display/KAFKA/KIP-382%3A+MirrorMaker+2.0) which enables replicating data across two Kafka clusters. The `migrate` command takes the required argument `--dcos-bootstrap-servers` along with the `--namespace` and `--instance` parameters to print the migration command. Use this command once the KUDO Kafka brokers are up and running. It is necessary that your source kafka cluster brokers are accessible from destination kafka cluster brokers.
+
+```
+➜ python3 main.py migrate --help
+
+usage: main.py migrate [-h] [--namespace NAMESPACE] [--instance INSTANCE] [--dcos-bootstrap-servers DCOS_BOOTSTRAP_SERVERS]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --namespace NAMESPACE
+                        Namespace of the kafka pods (defaults to default)
+  --instance INSTANCE   Name of the Kafka Kudo installation (defaults to kafka-instance)
+  --dcos-bootstrap-servers DCOS_BOOTSTRAP_SERVERS
+                        Externally exposed DC/OS Kafka bootstrap servers.
+```
+To start the migtation, we need to update the installed KUDO Kafka instances by enabling the MirrorMaker. We get the final migration command by running the following command.
+
+```
+➜ python3 main.py migrate --dcos-bootstrap-servers=other-server-1.example.com,other-server-2.example.com
+
+--------------------------------------------------
+Make sure the KUDO Kakfka installation plan shows COMPELTE, before proceeding for migration.
+--------------------------------------------------
+Run the following command to install start migration of your Kafka Cluster 
+    kubectl kudo update --instance=kafka-instance --namespace=default \
+    -p MIRROR_MAKER_ENABLED=true \
+    -p MIRROR_MAKER_EXTERNAL_BOOTSTRAP_SERVERS=other-server-1.example.com,other-server-2.example.com \
+    -p MIRROR_MAKER_EXTERNAL_CLUSTER_TYPE=DESTINATION
+
+```
+
+Pleas refer to KUDO Kafka [docs](https://kudo.dev/docs/runbooks/kafka/mirrormaker.html#starting-mirrormaker) for more details.
