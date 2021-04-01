@@ -31,8 +31,7 @@ def install(args):
 def migrate(args):
 
     # Print migration instructions for DC/OS Kafka to KUDO Kafka
-    mig.print_migration_instructions(args.namespace, args.instance,
-                                     args.dcos_bootstrap_servers)
+    mig.print_migration_instructions(args.namespace, args.instance, args.dcos_bootstrap_servers)
 
 
 def main():
