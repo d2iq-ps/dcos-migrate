@@ -168,7 +168,7 @@ To start the migtation, we need to update the installed KUDO Kafka instances by 
 --------------------------------------------------
 Make sure the KUDO Kakfka installation plan shows COMPELTE, before proceeding for migration.
 --------------------------------------------------
-Run the following command to install start migration of your Kafka Cluster 
+Run the following command to start migration of your Kafka cluster 
     kubectl kudo update --instance=kafka-instance --namespace=default \
     -p MIRROR_MAKER_ENABLED=true \
     -p MIRROR_MAKER_EXTERNAL_BOOTSTRAP_SERVERS=other-server-1.example.com,other-server-2.example.com \

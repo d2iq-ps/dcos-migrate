@@ -17,9 +17,9 @@ def print_migration_instructions(namespace: str, instance: str, bootstrap_server
     # Issue commands for initiating the migration process
     print(separator)
     print(colors.BOLD +
-          "Make sure the KUDO Kakfka installation plan shows COMPELTE, before proceeding for migration." + colors.ENDC)
+          "Make sure the KUDO Kafka installation plan shows COMPELTE, before proceeding for migration." + colors.ENDC)
     print(separator)
-    print(colors.OKGREEN + "Run the following command to install start migration of your Kafka Cluster {}".format(
+    print(colors.OKGREEN + "Run the following command to start migration of your Kafka cluster {}".format(
         KUDO_MIGRATION_CMD.format(
             kubectl=KUBECTL, namespace=namespace, instance=instance, bootstrap_servers=bootstrap_servers)) +
           colors.ENDC)

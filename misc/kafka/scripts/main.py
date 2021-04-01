@@ -29,23 +29,10 @@ def install(args):
 
 
 def migrate(args):
-    # Get migration parameters
-    migration_params = parse_migrate_params(args)
+
     # Print migration instructions for DC/OS Kafka to KUDO Kafka
     mig.print_migration_instructions(args.namespace, args.instance,
-                                     migration_params["MIRROR_MAKER_EXTERNAL_BOOTSTRAP_SERVERS"])
-
-
-def parse_migrate_params(args) -> dict:
-    """Parses the parameters for migration related parameters"""
-    parsed_params = {}
-
-    if len(args.dcos_bootstrap_servers) == 0:
-        log.error("Missing value of --dcos-bootstrap-servers")
-        exit(1)
-    parsed_params["MIRROR_MAKER_EXTERNAL_BOOTSTRAP_SERVERS"] = args.dcos_bootstrap_servers
-
-    return parsed_params
+                                     args.dcos_bootstrap_servers)
 
 
 def main():
@@ -155,6 +142,7 @@ def main():
     migrate_cmd.add_argument(
         "--dcos-bootstrap-servers",
         type=str,
+        required=True,
         default="",
         help="Externally exposed DC/OS Kafka bootstrap servers.",
     )
