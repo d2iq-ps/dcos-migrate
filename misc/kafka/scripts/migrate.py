@@ -11,8 +11,9 @@ def print_migration_instructions(namespace: str, instance: str, bootstrap_server
     KUDO_MIGRATION_CMD = """
     {kubectl} kudo update --instance={instance} --namespace={namespace} \\
     -p MIRROR_MAKER_ENABLED=true \\
+    -p MIRROR_MAKER_TOPIC_WHITELIST=".*" \
     -p MIRROR_MAKER_EXTERNAL_BOOTSTRAP_SERVERS={bootstrap_servers} \\
-    -p MIRROR_MAKER_EXTERNAL_CLUSTER_TYPE=DESTINATION
+    -p MIRROR_MAKER_EXTERNAL_CLUSTER_TYPE=SOURCE
     """
     # Issue commands for initiating the migration process
     print(separator)

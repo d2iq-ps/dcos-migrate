@@ -142,7 +142,6 @@ def main():
         "--dcos-bootstrap-servers",
         type=str,
         required=True,
-        default="",
         help="Externally exposed DC/OS Kafka bootstrap servers.",
     )
     migrate_cmd.set_defaults(func=migrate)
