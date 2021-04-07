@@ -4,6 +4,7 @@ import sys
 
 import backup
 import translate
+import migrate as mig
 
 
 def download(args):
@@ -17,9 +18,20 @@ def install(args):
     is_ok = translate.translate_mesos_to_k8s(args.config_file, args.target_file)
     if is_ok:
         # Print installation instructions for zookeeper
-        translate.print_instructions_zk(args.namespace, "zookeeper-instance", args.target_file, args.operator_version)
+        translate.print_instructions_zk(
+            args.namespace,
+            "zookeeper-instance",
+            args.target_file,
+            args.operator_version,
+        )
         # Print installation instructions for kafka
         translate.print_instructions_kafka(args.namespace, args.instance, args.target_file, args.operator_version)
+
+
+def migrate(args):
+
+    # Print migration instructions for DC/OS Kafka to KUDO Kafka
+    mig.print_migration_instructions(args.namespace, args.instance, args.dcos_bootstrap_servers)
 
 
 def main():
@@ -108,6 +120,31 @@ def main():
         help="Kudo Kafka version (defaults to 1.3.3)",
     )
     install_cmd.set_defaults(func=install)
+
+    # Step 3 : Migrate the schema and data from DC/OS Kafka to KUDO Kafka
+    migrate_cmd = subparsers.add_parser(
+        "migrate",
+        help="Restore the Schema and Data from the backup of DC/OS Kafka to KUDO Kafka",
+    )
+    migrate_cmd.add_argument(
+        "--namespace",
+        type=str,
+        default="default",
+        help="Namespace of the kafka pods (defaults to default)",
+    )
+    migrate_cmd.add_argument(
+        "--instance",
+        type=str,
+        default="kafka-instance",
+        help="Name of the Kafka Kudo installation (defaults to kafka-instance)",
+    )
+    migrate_cmd.add_argument(
+        "--dcos-bootstrap-servers",
+        type=str,
+        required=True,
+        help="Externally exposed DC/OS Kafka bootstrap servers.",
+    )
+    migrate_cmd.set_defaults(func=migrate)
 
     args = parser.parse_args()
     if len(sys.argv) == 1:
