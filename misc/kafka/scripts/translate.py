@@ -15,6 +15,7 @@ SPECIALLY VALUES OF THESE FIELDS SHOULD BE ADJUSTED AS PER THE CLUSTER:
 BROKER_COUNT
 BROKER_CPUS
 BROKER_MEM
+BROKER_PORT
 DISK_SIZE
 """
 
@@ -115,6 +116,9 @@ def translate_mesos_to_k8s(src_file: str, target_file: str) -> bool:
 
     # Convert Broker Memory from MB to GiB
     src_envs["BROKER_MEM"] = str(math.ceil(float(src_envs["BROKER_MEM"]) / 1024)) + "Gi"
+
+    # Change default Broker Port to 9093
+    src_envs["BROKER_PORT"] = "9093"
 
     with open(target_file, "w") as f:
         for tmpl in tmpl_lines:
