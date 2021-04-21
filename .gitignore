@@ -21,6 +21,7 @@ __pycache__/*
 .pydevproject
 .settings
 .idea
+*.iml
 tags
 .vscode
 
@@ -54,3 +55,4 @@ MANIFEST
 
 /dcos-migrate
 Dockerfile.tmp
+/state
