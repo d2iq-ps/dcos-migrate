@@ -14,6 +14,7 @@ STATE_PATH: Path = Path("dcos-migrate") / "migrate/marathon/stateful-copy"
 def make_original_k8s_patch(original_service: Dict[str, Any]) -> Dict[str, Any]:
     containers_patch = [{
         "command": (c["command"] if "command" in c else None),
+        "startupProbe": (c["startupProbe"] if "startupProbe" in c else None),
         "livenessProbe": (c["livenessProbe"] if "livenessProbe" in c else None),
         "readinessProbe": (c["readinessProbe"] if "readinessProbe" in c else None),
         "name": c["name"]
@@ -26,7 +27,8 @@ def make_sleeper_k8s_patch(original_service: Dict[str, Any]) -> Dict[str, Any]:
         "command": ["sleep", "604800"],
         "name": c["name"],
         "livenessProbe": None,
-        "readinessProbe": None
+        "readinessProbe": None,
+        "startupProbe": None
     } for c in original_service['spec']['template']['spec']['containers']]
     return {"spec": {"template": {"spec": {"containers": containers_patch}}}}
 

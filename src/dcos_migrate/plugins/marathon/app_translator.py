@@ -204,6 +204,33 @@ def rename(name: str) -> Callable[[Dict[str, Any]], Translated]:
     return lambda _: Translated({name: _})
 
 
+def readiness_check_to_probe(check: Dict[str, Any], error_location: str) -> Tuple[Dict[str, Any], List[str]]:
+    def translate_http_get(fields: Dict[str, Any]) -> Translated:
+        httpGet = {
+            "port": fields["portName"],  # Marathon sets a default value of 'http-api' if not initially provided
+            "path": fields["path"],  # Marathon sets a default value of '/' if not initially provided
+            "scheme": fields[
+                "protocol"],  # 'HTTP' or 'HTTPS' are allowed values by Marathon for this field. Marathon defaults to http when not provided.
+        }
+        return Translated({'httpGet': httpGet})
+
+    mapping: Dict[MappingKey, Any] = {
+        'name': skip_quietly,
+        'intervalSeconds': rename('periodSeconds'),
+        'timeoutSeconds': rename('timeoutSeconds'),
+        ('protocol', 'path', 'portName'): translate_http_get,
+        'httpStatusCodesForReady': skip_quietly,
+        'preserveLastResponse': skip_quietly
+    }
+
+    probe, warnings = apply_mapping(mapping, check, error_location)
+    warnings.append(
+        "httpStatusCodesForReady are not translatable for readinessChecks, as Kubernetes considers any HTTP status 200-399 as successful."
+    )
+
+    return probe, warnings
+
+
 def health_check_to_probe(check: Dict[str, Any], get_port_by_index: Callable[[int, bool], int],
                           error_location: str) -> Tuple[Dict[str, Any], List[str]]:
     flattened_check = flatten(check)
@@ -237,6 +264,22 @@ def health_check_to_probe(check: Dict[str, Any], get_port_by_index: Callable[[in
                         "\nPlease check that the K8s probe is using the correct port.")
 
     return probe, warnings
+
+
+def translate_readiness_checks(readiness_checks: Sequence[Dict[str, Any]], error_location: str) -> Translated:
+    if len(readiness_checks) < 1:
+        return Translated()
+
+    readiness_probe, warnings = readiness_check_to_probe(readiness_checks[0], error_location)
+
+    # note: Marathon has never allowed more than one readiness check
+    excess_readiness_checks = readiness_checks[1:]
+    if excess_readiness_checks:
+        warnings.append(
+            'Error! More than one readiness check is defined. Marathon has never supported this. You should not see this message.'
+        )
+
+    return Translated(update=main_container({'readinessProbe': readiness_probe}), warnings=warnings)
 
 
 def translate_health_checks(fields: Dict[str, Any], error_location: str) -> Translated:
@@ -402,6 +445,7 @@ def generate_root_mapping(k8s_app_id: str, container_defaults: ContainerDefaults
         'fetch': lambda fetches: translate_fetch(fetches, container_defaults, error_location),
         ('healthChecks', 'container', 'portDefinitions'):
         lambda fields: translate_health_checks(fields, error_location),
+        'readinessChecks': lambda readinessChecks: translate_readiness_checks(readinessChecks, error_location),
         ('acceptedResourceRoles', 'id', 'role'): translate_multitenancy,
         'instances': lambda n: Translated(update={'spec': {
             'replicas': n
