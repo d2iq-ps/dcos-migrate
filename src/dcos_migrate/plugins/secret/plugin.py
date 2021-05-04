@@ -1,3 +1,5 @@
+from dcos.errors import DCOSHTTPException  # type: ignore
+
 from dcos_migrate.plugins.plugin import MigratePlugin
 from dcos_migrate.plugins.cluster import ClusterPlugin
 from dcos_migrate.system import DCOSClient, BackupList, Backup, Manifest, ManifestList
@@ -8,7 +10,6 @@ from kubernetes.client.models import V1Secret, V1ObjectMeta  # type: ignore
 import urllib
 import base64
 import logging
-from base64 import b64encode
 from typing import cast, Any, Dict, List
 
 
@@ -79,7 +80,18 @@ class SecretPlugin(MigratePlugin):
         backupList = BackupList()
         sec = DCOSSecretsService(client)
         path = ""
-        keys = sec.list(path)
+
+        if self.config_oss:
+            # OSS clusters do not have secrets; return empty secret list and do not attempt to fetch.
+            keys = []
+        else:
+            try:
+                keys = sec.list(path)
+            except DCOSHTTPException as e:
+                print("\n\nError occurred while fetching secrets. Is this an OSS cluster?  "
+                      "Provide the flag --oss to disable fetching of secrets.\n\n")
+                raise e
+
         if keys:
             for key in keys:
                 secData = sec.get(path, key)

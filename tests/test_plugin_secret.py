@@ -1,3 +1,5 @@
+from typing import Dict
+
 import pytest
 import requests_mock
 import base64
@@ -23,6 +25,12 @@ def conf():
     })
 
 
+def new_secret_plugin(config: Dict[str, any] = {"global": {}}) -> SecretPlugin:
+    s = SecretPlugin()
+    s.config = config
+    return s
+
+
 @requests_mock.Mocker(kw='mock')
 def test_secret_backup(conf, **kwargs):
     kwargs['mock'].register_uri('GET',
@@ -36,7 +44,7 @@ def test_secret_backup(conf, **kwargs):
 
     client = DCOSClient(toml_config=conf)
 
-    s = SecretPlugin()
+    s = new_secret_plugin()
     backup = s.backup(client)
 
     assert len(backup) == 1
@@ -53,7 +61,7 @@ def test_secret_migrate():
         bl = BackupList()
         bl.append(Backup(pluginName='secret', backupName='foo.bar', data=data))
 
-        s = SecretPlugin()
+        s = new_secret_plugin()
 
         ml = s.migrate(backupList=bl, manifestList=ManifestList())
 

@@ -47,6 +47,15 @@ class MigratePlugin(object):
     def config_options(self) -> List[Arg]:
         return self._config_options
 
+    @property
+    def config_oss(self) -> bool:
+        """
+        Return whether or not oss is enabled.
+
+        Please note that configuration is not available during construction of this class. Let's let this fail if config has not been set yet.
+        """
+        return self._config['global'].get('oss', False) and True
+
     def backup(self, client: DCOSClient, backupList: BackupList, **kwargs: Any) -> BackupList:
         """
         backup gets a DCOSClient and BackupList of all previously ran backups.
